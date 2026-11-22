@@ -5,7 +5,7 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import html2canvas from 'html2canvas';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
-import ScratchCard from 'react-scratchcard-v2'; // <--- NOWY IMPORT ZDRAPKI
+import ScratchCard from 'react-scratchcard-v2'; 
 
 export default function App() {
   const { dayId } = useParams();
@@ -20,8 +20,12 @@ export default function App() {
   const [reaction, setReaction] = useState(null);
   const [isCompleted, setIsCompleted] = useState(false);
   
+  // Stany minigry
+  const [trivia, setTrivia] = useState(null);
+  const [triviaError, setTriviaError] = useState(false);
+  
   const [hasDrawn, setHasDrawn] = useState(false);
-  const [isScratched, setIsScratched] = useState(false); // <--- STAN ZDRAPKI
+  const [isScratched, setIsScratched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [generatedImage, setGeneratedImage] = useState(null);
@@ -44,6 +48,17 @@ export default function App() {
           setPhotoUrl(data.photoUrl || null);
           setReaction(data.reaction || null);
           setIsCompleted(data.isCompleted || false);
+          
+          // Pobieranie zagadki, jeśli istnieje
+          if (data.question && data.ansA && data.ansB && data.ansC) {
+            setTrivia({
+              q: data.question,
+              A: data.ansA,
+              B: data.ansB,
+              C: data.ansC,
+              correct: data.correctAns || 'A'
+            });
+          }
         }
       } catch (e) {
         console.log("Błąd pobierania danych", e);
@@ -54,7 +69,7 @@ export default function App() {
       if (saved) {
         setVoucher(saved);
         setHasDrawn(true);
-        setIsScratched(true); // Jeśli wchodzi ponownie, bon jest już od razu "zdrapany"
+        setIsScratched(true); 
       } else {
         setVoucher(null);
         setHasDrawn(false);
@@ -68,6 +83,26 @@ export default function App() {
     const audio = new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_24e20f1883.mp3');
     audio.volume = 0.5;
     audio.play().catch(e => console.log("Brak autoodtwarzania", e));
+  };
+
+  const playErrorSound = () => {
+    // Krótki dźwięk błędu
+    const audio = new Audio('https://cdn.pixabay.com/audio/2021/08/04/audio_c6ccf3232f.mp3');
+    audio.volume = 0.4;
+    audio.play().catch(e => console.log(e));
+  }
+
+  // Funkcja wywoływana, gdy zaznaczy odpowiedź w minigrze
+  const handleTriviaAnswer = (selected) => {
+    if (selected === trivia.correct) {
+      // Dobra odpowiedź! Generujemy bon.
+      drawVoucher();
+    } else {
+      // Zła odpowiedź
+      playErrorSound();
+      setTriviaError(true);
+      setTimeout(() => setTriviaError(false), 2000);
+    }
   };
 
   const drawVoucher = async () => {
@@ -84,10 +119,9 @@ export default function App() {
       const randomIndex = Math.floor(Math.random() * todayOptions.length);
       const selectedVoucher = todayOptions[randomIndex];
 
-      // TYLKO LOSUJEMY BON - EFEKTY WOW SĄ ZAMROŻONE DO CZASU ZDRAPANIA
       setVoucher(selectedVoucher);
       setHasDrawn(true);
-      setIsScratched(false); // Pokazujemy zdrapkę
+      setIsScratched(false); 
       
       const storageKey = isTestMode ? `test_voucher_day_${currentDay}` : `voucher_day_${currentDay}`;
       localStorage.setItem(storageKey, selectedVoucher);
@@ -99,7 +133,6 @@ export default function App() {
     }
   };
 
-  // FUNKCJA ODPALANA, GDY DZIEWCZYNA ZDRAPIE 60% POWIERZCHNI
   const handleScratchComplete = () => {
     setIsScratched(true);
     playMagicSound();
@@ -133,18 +166,14 @@ export default function App() {
   const shareAsImage = async () => {
     if (!captureRef.current) return;
     try {
-      const canvas = await html2canvas(captureRef.current, {
-        backgroundColor: '#450a0a', 
-        scale: 2,
-        useCORS: true
-      });
+      const canvas = await html2canvas(captureRef.current, { backgroundColor: '#450a0a', scale: 2, useCORS: true });
       const base64image = canvas.toDataURL("image/png");
       setGeneratedImage(base64image);
     } catch (error) {}
   };
 
   if (isNaN(currentDay) || currentDay < 1 || currentDay > 24) {
-    return <div className="min-h-screen bg-gradient-to-br from-red-900 to-emerald-950 flex items-center justify-center p-4"><div className="text-amber-400 text-2xl font-bold font-serif">Nieprawidłowy dzień! 🎁</div></div>;
+    return <div className="min-h-screen bg-gradient-to-br from-red-900 to-emerald-950 flex items-center justify-center"><div className="text-amber-400 text-2xl font-bold font-serif">Nieprawidłowy dzień! 🎁</div></div>;
   }
 
   if (isLocked) {
@@ -154,7 +183,7 @@ export default function App() {
           <h2 className="text-6xl mb-4 animate-bounce">🎁</h2>
           <h2 className="text-3xl font-bold text-amber-400 mb-4 font-serif">Jeszcze nie czas!</h2>
           <p className="text-red-200 text-lg mb-8 italic">Ten prezent otworzy się dopiero <strong>{currentDay} grudnia</strong>.</p>
-          <Link to="/" className="inline-block bg-gradient-to-r from-emerald-700 to-emerald-900 text-amber-300 font-bold py-3 px-8 rounded-full border border-emerald-500 transition-transform hover:scale-105">Wróć do kalendarza</Link>
+          <Link to="/" className="inline-block bg-gradient-to-r from-emerald-700 to-emerald-900 text-amber-300 font-bold py-3 px-8 rounded-full border border-emerald-500">Wróć do kalendarza</Link>
         </div>
       </div>
     );
@@ -174,17 +203,32 @@ export default function App() {
             Grudzień {currentDay}
           </h1>
           
+          {/* LOGIKA WYŚWIETLANIA: MINIGRA -> ZDRAPKA -> BON */}
           {!hasDrawn ? (
-            <button 
-              onClick={drawVoucher}
-              disabled={isLoading}
-              className="bg-gradient-to-br from-emerald-600 to-emerald-800 hover:from-emerald-500 text-amber-300 font-bold py-5 px-10 rounded-full shadow-[0_0_20px_rgba(4,120,87,0.6)] transition-all transform hover:scale-105 disabled:opacity-50 border-2 border-emerald-400 font-serif text-xl"
-            >
-              {isLoading ? "Rozwiązywanie wstążki..." : "Odkryj dzisiejszy prezent 🎀"}
-            </button>
+            trivia ? (
+              // WIDOK ZAGADKI
+              <div className="bg-indigo-950/80 border-2 border-indigo-500/50 p-6 rounded-2xl max-w-md w-full text-center shadow-[0_0_30px_rgba(79,70,229,0.4)] backdrop-blur-sm">
+                <h2 className="text-indigo-300 font-bold uppercase tracking-widest text-sm mb-4">Mikołaj sprawdza wiedzę 🧩</h2>
+                <p className="text-xl text-white font-serif italic mb-8">"{trivia.q}"</p>
+                
+                <div className="flex flex-col gap-3">
+                  <button onClick={() => handleTriviaAnswer('A')} className="bg-indigo-600/50 hover:bg-indigo-500 text-indigo-100 font-bold py-3 px-6 rounded-xl border border-indigo-400 transition-colors">{trivia.A}</button>
+                  <button onClick={() => handleTriviaAnswer('B')} className="bg-indigo-600/50 hover:bg-indigo-500 text-indigo-100 font-bold py-3 px-6 rounded-xl border border-indigo-400 transition-colors">{trivia.B}</button>
+                  <button onClick={() => handleTriviaAnswer('C')} className="bg-indigo-600/50 hover:bg-indigo-500 text-indigo-100 font-bold py-3 px-6 rounded-xl border border-indigo-400 transition-colors">{trivia.C}</button>
+                </div>
+
+                {triviaError && (
+                  <p className="text-red-400 font-bold mt-6 animate-bounce">❌ Zła odpowiedź, spróbuj jeszcze raz!</p>
+                )}
+              </div>
+            ) : (
+              // ZWYKŁY PRZYCISK JEŚLI BRAK ZAGADKI
+              <button onClick={drawVoucher} disabled={isLoading} className="bg-gradient-to-br from-emerald-600 to-emerald-800 hover:from-emerald-500 text-amber-300 font-bold py-5 px-10 rounded-full shadow-[0_0_20px_rgba(4,120,87,0.6)] transition-all transform hover:scale-105 font-serif text-xl">
+                {isLoading ? "Rozwiązywanie wstążki..." : "Odkryj dzisiejszy prezent 🎀"}
+              </button>
+            )
           ) : (
             <div className="flex flex-col items-center w-full max-w-md">
-              
               {photoUrl && (
                 <div className="bg-white p-3 pb-6 rounded-sm shadow-2xl transform -rotate-2 hover:rotate-0 transition-transform mb-6 border border-slate-200 flex flex-col items-center w-auto max-w-full mx-auto">
                   <img src={photoUrl} alt="Wspomnienie" className="w-auto h-auto max-w-full max-h-[50vh] border border-slate-100" crossOrigin="anonymous" />
@@ -192,58 +236,32 @@ export default function App() {
                 </div>
               )}
 
-              {/* LOGIKA ZDRAPKI LUB OTWARTEGO BONU */}
               {!isScratched ? (
                 <div className="w-full flex flex-col items-center animate-fade-in mb-6">
-                  <p className="text-amber-300 font-serif mb-4 animate-pulse font-bold text-lg text-center">
-                    👇 Zdrapka! 👇
-                  </p>
-                  
-                  {/* Komponent Zdrapki */}
-                  <div className="rounded-xl overflow-hidden shadow-[0_0_30px_rgba(251,191,36,0.4)] border-4 border-amber-500">
-                    <ScratchCard
-                      width={320}
-                      height={200}
-                      image="https://images.unsplash.com/photo-1618424181497-157f25b64623?q=80&w=400&auto=format&fit=crop" // Złota folia
-                      finishPercent={60} // Wybuchnie po zdrapaniu 60%
-                      onComplete={handleScratchComplete}
-                    >
-                      {/* To, co jest ukryte POD zdrapką */}
-                      <div className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-amber-50 text-red-950 p-6 flex flex-col justify-center items-center text-center w-[320px] h-[200px] relative">
-                        <div className="absolute top-2 left-2 text-xl opacity-30">🎄</div>
-                        <div className="absolute bottom-2 right-2 text-xl opacity-30">🦌</div>
-                        <h2 className="text-lg font-bold mb-3 text-emerald-800 font-serif uppercase tracking-widest border-b-2 border-emerald-800/20 pb-2">
-                          Świąteczny bon
-                        </h2>
-                        <p className="text-lg italic font-medium font-serif leading-relaxed text-red-950 line-clamp-3 px-2">
-                          "{voucher}"
-                        </p>
+                  <p className="text-amber-300 font-serif mb-4 animate-pulse font-bold text-lg text-center">👇 Zdrap złotą folię palcem! 👇</p>
+                  <div className="rounded-xl overflow-hidden shadow-[0_0_30px_rgba(251,191,36,0.4)] border-4 border-amber-500 bg-amber-50">
+                    <ScratchCard width={320} height={200} image="https://images.unsplash.com/photo-1618424181497-157f25b64623?q=80&w=400&auto=format&fit=crop" finishPercent={60} onComplete={handleScratchComplete}>
+                      <div className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] text-red-950 p-6 flex flex-col justify-center items-center text-center w-[320px] h-[200px] relative">
+                        <h2 className="text-lg font-bold mb-3 text-emerald-800 font-serif uppercase tracking-widest border-b-2 border-emerald-800/20 pb-2">Świąteczny bon</h2>
+                        <p className="text-lg italic font-medium font-serif leading-relaxed text-red-950 line-clamp-3 px-2">"{voucher}"</p>
                       </div>
                     </ScratchCard>
                   </div>
                 </div>
               ) : (
-                // Zwykła karta bonu, która pojawia się po zdrapaniu
                 <div className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-amber-50 text-red-950 p-8 rounded-xl shadow-[0_0_40px_rgba(251,191,36,0.3)] text-center w-full border-4 border-double border-red-900 relative mb-6 animate-fade-in">
                   <div className="absolute top-2 left-2 text-2xl opacity-30">🎄</div>
                   <div className="absolute bottom-2 right-2 text-2xl opacity-30">🦌</div>
-                  <h2 className="text-xl font-bold mb-4 text-emerald-800 font-serif uppercase tracking-widest border-b-2 border-emerald-800/20 pb-4">
-                    Twój świąteczny bon
-                  </h2>
-                  <p className="text-2xl italic font-medium font-serif leading-relaxed text-red-950">
-                    "{voucher}"
-                  </p>
+                  <h2 className="text-xl font-bold mb-4 text-emerald-800 font-serif uppercase tracking-widest border-b-2 border-emerald-800/20 pb-4">Twój świąteczny bon</h2>
+                  <p className="text-2xl italic font-medium font-serif leading-relaxed text-red-950">"{voucher}"</p>
                 </div>
               )}
-
             </div>
           )}
         </div>
         
-        {/* PANEL AKCJI WIDOCZNY TYLKO JEŚLI ZDRAPKA ZOSTAŁA UKOŃCZONA */}
         {hasDrawn && isScratched && (
           <div className="flex flex-col items-center gap-6 z-10 mt-2 w-full max-w-md animate-fade-in">
-            
             <div className="bg-red-950/40 p-4 rounded-2xl border border-red-800 w-full text-center backdrop-blur-sm">
               {!reaction ? (
                 <>
@@ -260,10 +278,7 @@ export default function App() {
             </div>
 
             {!isCompleted ? (
-              <button 
-                onClick={handleComplete}
-                className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-all transform hover:scale-105 border border-emerald-400 text-lg flex items-center justify-center gap-2"
-              >
+              <button onClick={handleComplete} className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-all transform hover:scale-105 border border-emerald-400 text-lg flex items-center justify-center gap-2">
                 <span>🎯</span> Oznacz jako ZREALIZOWANY
               </button>
             ) : (
@@ -271,17 +286,8 @@ export default function App() {
                 <span>✅</span> Ten bon został zrealizowany!
               </div>
             )}
-
-            <button 
-              onClick={shareAsImage}
-              className="mt-4 bg-red-800/50 hover:bg-red-700 text-amber-100 font-bold py-3 px-8 rounded-full shadow-lg transition-colors flex items-center gap-2 border border-red-600"
-            >
-              📸 Zapisz / Wyślij obrazek
-            </button>
-            
-            <Link to={isTestMode ? "/test" : "/"} className="text-sm text-red-300 hover:text-amber-300 font-bold underline">
-              Wróć do kalendarza
-            </Link>
+            <button onClick={shareAsImage} className="mt-4 bg-red-800/50 hover:bg-red-700 text-amber-100 font-bold py-3 px-8 rounded-full shadow-lg transition-colors flex items-center gap-2 border border-red-600">📸 Zapisz / Wyślij obrazek</button>
+            <Link to={isTestMode ? "/test" : "/"} className="text-sm text-red-300 hover:text-amber-300 font-bold underline">Wróć do kalendarza</Link>
           </div>
         )}
       </div>
@@ -290,7 +296,7 @@ export default function App() {
         <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-6 backdrop-blur-md">
           <p className="text-amber-400 font-bold mb-6 text-center text-lg animate-pulse font-serif">👇 Przytrzymaj obrazek palcem, aby zapisać 👇</p>
           <img src={generatedImage} alt="Bon" className="max-h-[65vh] rounded-xl border-2 border-amber-400/50" />
-          <button onClick={() => setGeneratedImage(null)} className="mt-10 bg-red-700 text-white font-bold py-4 px-10 rounded-full border border-red-500 transition-colors shadow-lg text-lg">✖ Zamknij</button>
+          <button onClick={() => setGeneratedImage(null)} className="mt-10 bg-red-700 hover:bg-red-600 text-white font-bold py-4 px-10 rounded-full border border-red-500 transition-colors shadow-lg text-lg">✖ Zamknij</button>
         </div>
       )}
     </>
