@@ -3,19 +3,21 @@ import { useParams, Link, useLocation } from 'react-router-dom';
 import { db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import html2canvas from 'html2canvas';
+import Confetti from 'react-confetti';
+import { useWindowSize } from 'react-use';
 
 export default function App() {
   const { dayId } = useParams();
   const currentDay = parseInt(dayId, 10);
-  
   const location = useLocation();
   const isTestMode = location.pathname.startsWith('/test');
+  
+  const { width, height } = useWindowSize();
   
   const [voucher, setVoucher] = useState(null);
   const [hasDrawn, setHasDrawn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Nowy stan dla wygenerowanego obrazka na iOS
+  const [showConfetti, setShowConfetti] = useState(false);
   const [generatedImage, setGeneratedImage] = useState(null);
   
   const captureRef = useRef(null);
@@ -37,6 +39,14 @@ export default function App() {
     }
   }, [currentDay, isTestMode]);
 
+  // Funkcja odtwarzająca dźwięk
+  const playMagicSound = () => {
+    // Używamy darmowego świątecznego dzwoneczka z bezpiecznego źródła
+    const audio = new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_24e20f1883.mp3');
+    audio.volume = 0.5;
+    audio.play().catch(e => console.log("Przeglądarka zablokowała dźwięk", e));
+  };
+
   const drawVoucher = async () => {
     setIsLoading(true);
     try {
@@ -51,11 +61,19 @@ export default function App() {
       const randomIndex = Math.floor(Math.random() * todayOptions.length);
       const selectedVoucher = todayOptions[randomIndex];
 
+      // EFETKY WOW:
+      playMagicSound();
+      setShowConfetti(true);
+      
       setVoucher(selectedVoucher);
       setHasDrawn(true);
       
       const storageKey = isTestMode ? `test_voucher_day_${currentDay}` : `voucher_day_${currentDay}`;
       localStorage.setItem(storageKey, selectedVoucher);
+      
+      // Wyłącz konfetti po 5 sekundach
+      setTimeout(() => setShowConfetti(false), 5000);
+      
     } catch (error) {
       console.error("Błąd bazy:", error);
       alert("Błąd połączenia z bazą danych.");
@@ -70,17 +88,12 @@ export default function App() {
       const canvas = await html2canvas(captureRef.current, {
         backgroundColor: '#450a0a', 
         scale: 2,
-        useCORS: true // Pomaga przy generowaniu na telefonach
+        useCORS: true
       });
-      
-      // Zamiast wymuszać natywne API udostępniania, generujemy obrazek Base64 
-      // i pokazujemy go użytkownikowi na ekranie.
       const base64image = canvas.toDataURL("image/png");
       setGeneratedImage(base64image);
-
     } catch (error) {
       console.error("Błąd generowania", error);
-      alert("Nie udało się wygenerować obrazka.");
     }
   };
 
@@ -111,6 +124,9 @@ export default function App() {
 
   return (
     <>
+      {/* Konfetti renderowane na pełnym ekranie w momencie losowania */}
+      {showConfetti && <Confetti width={width} height={height} recycle={false} numberOfPieces={500} gravity={0.2} />}
+
       <div className="min-h-screen bg-gradient-to-br from-red-900 via-red-950 to-emerald-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(251,191,36,0.15)_0%,_transparent_60%)] pointer-events-none"></div>
 
@@ -162,23 +178,13 @@ export default function App() {
         )}
       </div>
 
-      {/* Ekran pop-up z obrazkiem na iOS/Android */}
       {generatedImage && (
         <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-6 backdrop-blur-md animate-fade-in">
           <p className="text-amber-400 font-bold mb-6 text-center text-lg animate-pulse font-serif">
             👇 Przytrzymaj obrazek palcem, <br/>aby go zapisać lub wysłać 👇
           </p>
-          
-          <img 
-            src={generatedImage} 
-            alt="Wygenerowany bon" 
-            className="max-h-[65vh] w-auto rounded-xl shadow-[0_0_40px_rgba(251,191,36,0.3)] border-2 border-amber-400/50"
-          />
-          
-          <button 
-            onClick={() => setGeneratedImage(null)}
-            className="mt-10 bg-red-700 hover:bg-red-600 text-white font-bold py-4 px-10 rounded-full border border-red-500 shadow-lg text-lg"
-          >
+          <img src={generatedImage} alt="Wygenerowany bon" className="max-h-[65vh] w-auto rounded-xl shadow-[0_0_40px_rgba(251,191,36,0.3)] border-2 border-amber-400/50" />
+          <button onClick={() => setGeneratedImage(null)} className="mt-10 bg-red-700 hover:bg-red-600 text-white font-bold py-4 px-10 rounded-full border border-red-500 shadow-lg text-lg">
             ✖ Zamknij
           </button>
         </div>
