@@ -64,7 +64,7 @@ export default function App() {
   const playMagicSound = () => {
     const audio = new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_24e20f1883.mp3');
     audio.volume = 0.5;
-    audio.play().catch(e => console.log("Brak autoodtwarzania"));
+    audio.play().catch(e => console.log("Brak autoodtwarzania", e));
   };
 
   const drawVoucher = async () => {
@@ -100,7 +100,7 @@ export default function App() {
 
   // Zapisywanie reakcji w Firebase
   const handleReaction = async (emoji) => {
-    if (isTestMode) return; // W trybie testowym nie nadpisujemy bazy
+    if (isTestMode) return; 
     try {
       const docRef = doc(db, "vouchers", currentDay.toString());
       await updateDoc(docRef, { reaction: emoji });
@@ -147,7 +147,7 @@ export default function App() {
           <h2 className="text-6xl mb-4 animate-bounce">🎁</h2>
           <h2 className="text-3xl font-bold text-amber-400 mb-4 font-serif">Jeszcze nie czas!</h2>
           <p className="text-red-200 text-lg mb-8 italic">Ten prezent otworzy się dopiero <strong>{currentDay} grudnia</strong>.</p>
-          <Link to="/" className="inline-block bg-gradient-to-r from-emerald-700 to-emerald-900 text-amber-300 font-bold py-3 px-8 rounded-full border border-emerald-500">Wróć do kalendarza</Link>
+          <Link to="/" className="inline-block bg-gradient-to-r from-emerald-700 to-emerald-900 text-amber-300 font-bold py-3 px-8 rounded-full border border-emerald-500 transition-transform hover:scale-105">Wróć do kalendarza</Link>
         </div>
       </div>
     );
@@ -179,11 +179,16 @@ export default function App() {
           ) : (
             <div className="flex flex-col items-center w-full max-w-md">
               
-              {/* Polaroid ze zdjęciem (Jeśli dodano link w Adminie) */}
+              {/* Polaroid ze zdjęciem (Idealnie dopasowujący się do obrazka) */}
               {photoUrl && (
-                <div className="bg-white p-3 pb-6 rounded-sm shadow-2xl transform -rotate-2 hover:rotate-0 transition-transform mb-6 w-full border border-slate-200">
-                  <img src={photoUrl} alt="Wspomnienie" className="w-full h-64 object-cover border border-slate-100" crossOrigin="anonymous" />
-                  <p className="text-center text-slate-800 font-serif mt-3 text-lg italic">Wspomnienie roku</p>
+                <div className="bg-white p-3 pb-6 rounded-sm shadow-2xl transform -rotate-2 hover:rotate-0 transition-transform mb-6 border border-slate-200 flex flex-col items-center w-auto max-w-full mx-auto">
+                  <img 
+                    src={photoUrl} 
+                    alt="Wspomnienie" 
+                    className="w-auto h-auto max-w-full max-h-[50vh] border border-slate-100" 
+                    crossOrigin="anonymous" 
+                  />
+                  <p className="text-center text-slate-800 font-serif mt-4 text-lg italic">Wspomnienie roku</p>
                 </div>
               )}
 
@@ -254,7 +259,7 @@ export default function App() {
         <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-6 backdrop-blur-md">
           <p className="text-amber-400 font-bold mb-6 text-center text-lg animate-pulse font-serif">👇 Przytrzymaj obrazek palcem, aby zapisać 👇</p>
           <img src={generatedImage} alt="Bon" className="max-h-[65vh] rounded-xl border-2 border-amber-400/50" />
-          <button onClick={() => setGeneratedImage(null)} className="mt-10 bg-red-700 text-white font-bold py-4 px-10 rounded-full border border-red-500">✖ Zamknij</button>
+          <button onClick={() => setGeneratedImage(null)} className="mt-10 bg-red-700 hover:bg-red-600 text-white font-bold py-4 px-10 rounded-full border border-red-500 transition-colors shadow-lg text-lg">✖ Zamknij</button>
         </div>
       )}
     </>
