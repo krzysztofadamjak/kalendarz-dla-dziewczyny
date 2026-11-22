@@ -1,0 +1,22 @@
+{
+  "name": "Świąteczny Kalendarz",
+  "short_name": "Kalendarz",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#450a0a",
+  "theme_color": "#064e3b",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any apple"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any apple"
+    }
+  ]
+}
