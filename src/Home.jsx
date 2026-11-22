@@ -16,7 +16,7 @@ export default function Home() {
         🎄 Kalendarz 🎄
       </h1>
       <p className="text-red-200 mb-10 text-xl italic text-center z-10 font-serif">
-        Magiczny czas tylko dla nas
+        Magiczny czas tylko dla Starej starego
       </p>
       
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4 max-w-4xl w-full z-10">
@@ -38,7 +38,7 @@ export default function Home() {
         </Link>
         
         <Link to="/admin" className="text-red-300/40 hover:text-red-200 text-sm">
-          Panel Admina
+          Panel Starego
         </Link>
       </div>
     </div>
