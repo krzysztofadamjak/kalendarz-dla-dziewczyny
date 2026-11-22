@@ -196,7 +196,7 @@ export default function App() {
               {!isScratched ? (
                 <div className="w-full flex flex-col items-center animate-fade-in mb-6">
                   <p className="text-amber-300 font-serif mb-4 animate-pulse font-bold text-lg text-center">
-                    👇 Zdrap złotą folię palcem! 👇
+                    👇 Zdrapka! 👇
                   </p>
                   
                   {/* Komponent Zdrapki */}
