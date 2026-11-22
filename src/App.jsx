@@ -203,6 +203,13 @@ export default function App() {
     setIsScratched(true);
     playMagicSound();
     setShowConfetti(true);
+    
+    // NOWE: Zapisz moment zdrapania do licznika czasu w Portfelu!
+    const timeStorageKey = isTestMode ? `time_scratched_test_voucher_day_${currentDay}` : `time_scratched_voucher_day_${currentDay}`;
+    if (!localStorage.getItem(timeStorageKey)) {
+      localStorage.setItem(timeStorageKey, new Date().getTime().toString());
+    }
+
     setTimeout(() => setShowConfetti(false), 5000);
   };
 
@@ -221,6 +228,10 @@ export default function App() {
       const docRef = doc(db, "vouchers", currentDay.toString());
       await updateDoc(docRef, { isCompleted: true });
       setIsCompleted(true);
+      
+      // NOWE: Powiadom Portfel, że bon zrealizowano!
+      localStorage.setItem(`completed_voucher_day_${currentDay}`, 'true');
+      
       playMagicSound();
     } catch (e) {}
   };
