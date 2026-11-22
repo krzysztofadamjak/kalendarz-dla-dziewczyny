@@ -1,57 +1,73 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Snowfall from 'react-snowfall';
+import { db } from './firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 export default function Wallet() {
   const location = useLocation();
-  // Pobieramy informację ze ścieżki - domyślnie (np. po odświeżeniu) zakładamy bezpiecznie PROD (false)
   const isTestMode = location.state?.isTest || false;
 
   const [vouchers, setVouchers] = useState([]);
   const [now, setNow] = useState(new Date().getTime());
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Aktualizacja czasu co sekundę
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date().getTime()), 1000);
     return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
-    const loadedVouchers = [];
-    // Zależnie od trybu, szukamy tylko konkretnego przedrostka!
-    const prefix = isTestMode ? 'test_voucher_day_' : 'voucher_day_';
+    const fetchWallet = async () => {
+      const loadedVouchers = [];
 
-    for (let i = 1; i <= 24; i++) {
-      const voucherText = localStorage.getItem(`${prefix}${i}`);
-      
-      if (voucherText) {
-        let timeScratched = localStorage.getItem(`time_scratched_${prefix}${i}`);
-        if (!timeScratched) {
-          timeScratched = new Date().getTime().toString();
-          localStorage.setItem(`time_scratched_${prefix}${i}`, timeScratched);
+      if (isTestMode) {
+        // TEST CZYTA Z PAMIĘCI TELEFONU
+        for (let i = 1; i <= 24; i++) {
+          const voucherText = localStorage.getItem(`test_voucher_day_${i}`);
+          if (voucherText) {
+            let timeScratched = localStorage.getItem(`time_scratched_test_voucher_day_${i}`);
+            if (!timeScratched) timeScratched = new Date().getTime().toString();
+            loadedVouchers.push({
+              day: i,
+              text: voucherText,
+              expirationTime: parseInt(timeScratched, 10) + (48 * 60 * 60 * 1000),
+              isCompleted: localStorage.getItem(`completed_test_voucher_day_${i}`) === 'true',
+              isTest: true
+            });
+          }
         }
-
-        const expirationTime = parseInt(timeScratched, 10) + (48 * 60 * 60 * 1000);
-        const isCompleted = localStorage.getItem(`completed_${prefix}${i}`) === 'true';
-
-        loadedVouchers.push({
-          day: i,
-          text: voucherText,
-          expirationTime,
-          isCompleted,
-          isTest: isTestMode
-        });
+      } else {
+        // PROD CZYTA PROSTO Z CHMURY (FIREBASE)
+        try {
+          const snapshot = await getDocs(collection(db, "vouchers"));
+          snapshot.forEach(docSnap => {
+            const d = docSnap.data();
+            if (d.drawnVoucher && d.timeScratched) {
+              loadedVouchers.push({
+                day: parseInt(docSnap.id, 10),
+                text: d.drawnVoucher,
+                expirationTime: d.timeScratched + (48 * 60 * 60 * 1000),
+                isCompleted: d.isCompleted || false,
+                isTest: false
+              });
+            }
+          });
+        } catch (e) {
+          console.error("Błąd pobierania z chmury", e);
+        }
       }
-    }
-    
-    loadedVouchers.sort((a, b) => a.expirationTime - b.expirationTime);
-    setVouchers(loadedVouchers);
+      
+      loadedVouchers.sort((a, b) => a.expirationTime - b.expirationTime);
+      setVouchers(loadedVouchers);
+      setIsLoading(false);
+    };
+    fetchWallet();
   }, [isTestMode]);
 
   const getRemainingTime = (expTime) => {
     const diff = expTime - now;
     if (diff <= 0) return "Wygasł";
-    
     const h = Math.floor(diff / (1000 * 60 * 60));
     const m = Math.floor((diff / 1000 / 60) % 60);
     return `${h}h ${m}m`;
@@ -62,7 +78,6 @@ export default function Wallet() {
       <Snowfall color="#ffffff" snowflakeCount={40} style={{ opacity: 0.3, zIndex: 0 }} />
 
       <div className="z-10 w-full max-w-2xl flex flex-col items-center">
-        
         {isTestMode && <div className="bg-red-500 text-white font-bold py-1 px-8 rounded-full mb-4 animate-pulse">WIDOK TESTOWY PORTFELA</div>}
 
         <h1 className="text-4xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-b from-amber-200 to-amber-500 font-extrabold mb-2 font-serif text-center mt-6">
@@ -72,7 +87,9 @@ export default function Wallet() {
           Pamiętaj, każdy odkryty kupon ważny jest tylko 48 godzin!
         </p>
 
-        {vouchers.length === 0 ? (
+        {isLoading ? (
+          <div className="text-amber-400 font-bold animate-pulse text-xl mt-10">Synchronizacja z chmurą...</div>
+        ) : vouchers.length === 0 ? (
           <div className="bg-black/30 backdrop-blur-md border border-white/10 p-10 rounded-3xl text-center max-w-md w-full">
             <span className="text-6xl mb-4 block opacity-50">🪪</span>
             <h3 className="text-xl text-amber-200 font-bold mb-2">Portfel jest pusty!</h3>
@@ -118,13 +135,10 @@ export default function Wallet() {
                   </p>
                   
                   <div className="flex justify-between items-end border-t border-white/10 pt-4 z-10">
-                    <span className={`text-sm ${statusColor}`}>
-                      {statusText}
-                    </span>
-                    
+                    <span className={`text-sm ${statusColor}`}>{statusText}</span>
                     {!v.isCompleted && !isExpired && (
-                      <Link to={v.isTest ? `/test/${v.day}` : `/dzien/${v.day}`} className="bg-white/10 hover:bg-white/20 text-white text-xs font-bold py-2 px-4 rounded-full transition-colors border border-white/20">
-                        Przejdź do realizacji
+                      <Link to={v.isTest ? `/test/${v.day}` : `/dzien/${v.day}`} className="bg-white/10 hover:bg-white/20 text-white text-xs font-bold py-2 px-4 rounded-full border border-white/20">
+                        Przejdź
                       </Link>
                     )}
                   </div>
@@ -134,7 +148,6 @@ export default function Wallet() {
           </div>
         )}
 
-        {/* DYNAMICZNY POWRÓT ZALEŻNIE OD TEGO SKĄD PRZYSZLIŚMY */}
         <Link to={isTestMode ? "/test" : "/"} className="mt-12 bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-8 rounded-full border border-white/20 transition-all backdrop-blur-md shadow-lg">
           {isTestMode ? "Wróć do Testów" : "Wróć do Kalendarza"}
         </Link>

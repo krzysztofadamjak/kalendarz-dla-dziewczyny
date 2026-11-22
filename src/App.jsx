@@ -122,11 +122,27 @@ export default function App() {
           if (data.question && data.ansA && data.ansB && data.ansC) {
             setTrivia({ q: data.question, A: data.ansA, B: data.ansB, C: data.ansC, correct: data.correctAns || 'A' });
           }
+
+          // JEŚLI JESTEŚMY NA PROD I DANE SĄ W CHMURZE:
+          if (!isTestMode) {
+            if (data.drawnVoucher) {
+              setVoucher(data.drawnVoucher);
+              setHasDrawn(true);
+              setIsScratched(true);
+              return; // Mamy wszystko z chmury, ignorujemy localStorage!
+            } else {
+              // Jeśli w panelu Admina usunięto kupon (zresetowano)
+              localStorage.removeItem(`voucher_day_${currentDay}`);
+              localStorage.removeItem(`time_scratched_voucher_day_${currentDay}`);
+              localStorage.removeItem(`completed_voucher_day_${currentDay}`);
+            }
+          }
         }
       } catch (e) {
         console.log("Błąd pobierania danych", e);
       }
 
+      // Fallback dla trybu Test lub braku danych
       const storageKey = isTestMode ? `test_voucher_day_${currentDay}` : `voucher_day_${currentDay}`;
       const saved = localStorage.getItem(storageKey);
       if (saved) {
@@ -150,7 +166,6 @@ export default function App() {
   };
 
   const playGrinchSound = () => {
-    // Dźwięk błędu/brzęczyka
     const audio = new Audio('https://cdn.pixabay.com/audio/2021/08/04/audio_c6ccf3232f.mp3');
     audio.volume = 0.5;
     audio.play().catch(() => {});
@@ -169,11 +184,10 @@ export default function App() {
       const penaltyDurationSeconds = 60; // 1 MINUTA KARY
       setGrinchTimeLeft(penaltyDurationSeconds);
       
-      // Zapisujemy czas zakończenia kary w pamięci, by odświeżenie strony nie pomogło!
       const endTime = new Date().getTime() + (penaltyDurationSeconds * 1000);
       localStorage.setItem(`grinch_penalty_day_${currentDay}`, endTime.toString());
       
-      setTimeout(() => setTriviaError(false), 3000); // Komunikat o błędzie znika po 3s, ale licznik zostaje
+      setTimeout(() => setTriviaError(false), 3000); 
     }
   };
 
@@ -199,15 +213,28 @@ export default function App() {
     }
   };
 
-  const handleScratchComplete = () => {
+  const handleScratchComplete = async () => {
     setIsScratched(true);
     playMagicSound();
     setShowConfetti(true);
     
-    // NOWE: Zapisz moment zdrapania do licznika czasu w Portfelu!
+    const now = new Date().getTime();
     const timeStorageKey = isTestMode ? `time_scratched_test_voucher_day_${currentDay}` : `time_scratched_voucher_day_${currentDay}`;
+    
     if (!localStorage.getItem(timeStorageKey)) {
-      localStorage.setItem(timeStorageKey, new Date().getTime().toString());
+      localStorage.setItem(timeStorageKey, now.toString());
+      
+      // ZAPIS LOKALIZACJI ZDRAPKI DO CHMURY W TRYBIE PROD
+      if (!isTestMode) {
+        try {
+          await updateDoc(doc(db, "vouchers", currentDay.toString()), {
+            timeScratched: now,
+            drawnVoucher: voucher
+          });
+        } catch (e) {
+          console.log("Nie udało się zapisać do chmury", e);
+        }
+      }
     }
 
     setTimeout(() => setShowConfetti(false), 5000);
@@ -223,15 +250,19 @@ export default function App() {
   };
 
   const handleComplete = async () => {
-    if (isTestMode) return;
+    if (isTestMode) {
+      localStorage.setItem(`completed_test_voucher_day_${currentDay}`, 'true');
+      setIsCompleted(true);
+      playMagicSound();
+      return;
+    }
+    
     try {
       const docRef = doc(db, "vouchers", currentDay.toString());
       await updateDoc(docRef, { isCompleted: true });
       setIsCompleted(true);
       
-      // NOWE: Powiadom Portfel, że bon zrealizowano!
       localStorage.setItem(`completed_voucher_day_${currentDay}`, 'true');
-      
       playMagicSound();
     } catch (e) {}
   };
@@ -265,8 +296,8 @@ export default function App() {
   // ZMIANA TŁA I ŚNIEGU JEŚLI JEST KARA GRINCHA
   const isGrinchMode = grinchTimeLeft > 0;
   const bgGradient = isGrinchMode 
-    ? "from-slate-900 via-slate-950 to-black" // Mroczne, szare tło Grincha
-    : "from-red-900 via-red-950 to-emerald-950"; // Normalne, świąteczne tło
+    ? "from-slate-900 via-slate-950 to-black" 
+    : "from-red-900 via-red-950 to-emerald-950"; 
 
   return (
     <>
@@ -274,7 +305,6 @@ export default function App() {
 
       <div className={`min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] ${bgGradient} flex flex-col items-center justify-center p-4 relative overflow-hidden pb-20 font-sans transition-colors duration-1000`}>
         
-        {/* Śnieg: normalnie biały/żółty, podczas kary szary/czarny i gęstszy */}
         <Snowfall 
           color={isGrinchMode ? "#475569" : "#ffffff"} 
           snowflakeCount={isGrinchMode ? 150 : 80} 
@@ -293,7 +323,6 @@ export default function App() {
               <div className={`backdrop-blur-xl border p-8 rounded-3xl max-w-md w-full text-center shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative overflow-hidden transition-colors duration-1000 ${isGrinchMode ? 'bg-black/80 border-slate-700' : 'bg-black/40 border-white/10'}`}>
                 
                 {isGrinchMode ? (
-                  // WIDOK KARY GRINCHA
                   <div className="flex flex-col items-center justify-center py-6 animate-fade-in">
                     <span className="text-7xl mb-6 drop-shadow-[0_0_20px_rgba(34,197,94,0.6)]">🧌</span>
                     <h2 className="text-emerald-500 font-bold uppercase tracking-widest text-lg mb-2">
@@ -308,7 +337,6 @@ export default function App() {
                     </div>
                   </div>
                 ) : (
-                  // STANDARDOWY WIDOK ZAGADKI
                   <>
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-400 to-transparent opacity-50"></div>
                     <h2 className="text-amber-400/80 font-bold uppercase tracking-widest text-xs mb-6 flex items-center justify-center gap-2">
