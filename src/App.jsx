@@ -5,6 +5,7 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import html2canvas from 'html2canvas';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
+import ScratchCard from 'react-scratchcard-v2'; // <--- NOWY IMPORT ZDRAPKI
 
 export default function App() {
   const { dayId } = useParams();
@@ -20,6 +21,7 @@ export default function App() {
   const [isCompleted, setIsCompleted] = useState(false);
   
   const [hasDrawn, setHasDrawn] = useState(false);
+  const [isScratched, setIsScratched] = useState(false); // <--- STAN ZDRAPKI
   const [isLoading, setIsLoading] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [generatedImage, setGeneratedImage] = useState(null);
@@ -31,7 +33,6 @@ export default function App() {
 
   const isLocked = !isTestMode && (realMonth < 11 || (realMonth === 11 && realDate < currentDay));
 
-  // Pobieranie statusów z bazy i tekstu bonu
   useEffect(() => {
     const fetchVoucherData = async () => {
       try {
@@ -53,9 +54,11 @@ export default function App() {
       if (saved) {
         setVoucher(saved);
         setHasDrawn(true);
+        setIsScratched(true); // Jeśli wchodzi ponownie, bon jest już od razu "zdrapany"
       } else {
         setVoucher(null);
         setHasDrawn(false);
+        setIsScratched(false);
       }
     };
     fetchVoucherData();
@@ -81,16 +84,14 @@ export default function App() {
       const randomIndex = Math.floor(Math.random() * todayOptions.length);
       const selectedVoucher = todayOptions[randomIndex];
 
-      playMagicSound();
-      setShowConfetti(true);
-      
+      // TYLKO LOSUJEMY BON - EFEKTY WOW SĄ ZAMROŻONE DO CZASU ZDRAPANIA
       setVoucher(selectedVoucher);
       setHasDrawn(true);
+      setIsScratched(false); // Pokazujemy zdrapkę
       
       const storageKey = isTestMode ? `test_voucher_day_${currentDay}` : `voucher_day_${currentDay}`;
       localStorage.setItem(storageKey, selectedVoucher);
       
-      setTimeout(() => setShowConfetti(false), 5000);
     } catch (error) {
       alert("Błąd połączenia z bazą danych.");
     } finally {
@@ -98,7 +99,14 @@ export default function App() {
     }
   };
 
-  // Zapisywanie reakcji w Firebase
+  // FUNKCJA ODPALANA, GDY DZIEWCZYNA ZDRAPIE 60% POWIERZCHNI
+  const handleScratchComplete = () => {
+    setIsScratched(true);
+    playMagicSound();
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 5000);
+  };
+
   const handleReaction = async (emoji) => {
     if (isTestMode) return; 
     try {
@@ -110,7 +118,6 @@ export default function App() {
     }
   };
 
-  // Oznaczanie bonu jako zrealizowany w Firebase
   const handleComplete = async () => {
     if (isTestMode) return;
     try {
@@ -160,7 +167,6 @@ export default function App() {
       <div className="min-h-screen bg-gradient-to-br from-red-900 via-red-950 to-emerald-950 flex flex-col items-center justify-center p-4 relative overflow-hidden pb-20">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(251,191,36,0.15)_0%,_transparent_60%)] pointer-events-none"></div>
 
-        {/* Kontener do robienia screenshota */}
         <div ref={captureRef} className="flex flex-col items-center w-full z-10 pt-8 pb-4 px-4 rounded-3xl">
           {isTestMode && <div className="text-red-400 font-bold mb-2 text-sm">TRYB TESTOWY</div>}
           
@@ -179,39 +185,65 @@ export default function App() {
           ) : (
             <div className="flex flex-col items-center w-full max-w-md">
               
-              {/* Polaroid ze zdjęciem (Idealnie dopasowujący się do obrazka) */}
               {photoUrl && (
                 <div className="bg-white p-3 pb-6 rounded-sm shadow-2xl transform -rotate-2 hover:rotate-0 transition-transform mb-6 border border-slate-200 flex flex-col items-center w-auto max-w-full mx-auto">
-                  <img 
-                    src={photoUrl} 
-                    alt="Wspomnienie" 
-                    className="w-auto h-auto max-w-full max-h-[50vh] border border-slate-100" 
-                    crossOrigin="anonymous" 
-                  />
-                  <p className="text-center text-slate-800 font-serif mt-4 text-lg italic">Wspominanka</p>
+                  <img src={photoUrl} alt="Wspomnienie" className="w-auto h-auto max-w-full max-h-[50vh] border border-slate-100" crossOrigin="anonymous" />
+                  <p className="text-center text-slate-800 font-serif mt-4 text-lg italic">Wspomnienie roku</p>
                 </div>
               )}
 
-              {/* Karta Bonu */}
-              <div className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-amber-50 text-red-950 p-8 rounded-xl shadow-[0_0_40px_rgba(251,191,36,0.3)] text-center w-full border-4 border-double border-red-900 relative">
-                <div className="absolute top-2 left-2 text-2xl opacity-30">🎄</div>
-                <div className="absolute bottom-2 right-2 text-2xl opacity-30">🦌</div>
-                <h2 className="text-xl font-bold mb-4 text-emerald-800 font-serif uppercase tracking-widest border-b-2 border-emerald-800/20 pb-4">
-                  Twój świąteczny bon
-                </h2>
-                <p className="text-2xl italic font-medium font-serif leading-relaxed text-red-950">
-                  "{voucher}"
-                </p>
-              </div>
+              {/* LOGIKA ZDRAPKI LUB OTWARTEGO BONU */}
+              {!isScratched ? (
+                <div className="w-full flex flex-col items-center animate-fade-in mb-6">
+                  <p className="text-amber-300 font-serif mb-4 animate-pulse font-bold text-lg text-center">
+                    👇 Zdrap złotą folię palcem! 👇
+                  </p>
+                  
+                  {/* Komponent Zdrapki */}
+                  <div className="rounded-xl overflow-hidden shadow-[0_0_30px_rgba(251,191,36,0.4)] border-4 border-amber-500">
+                    <ScratchCard
+                      width={320}
+                      height={200}
+                      image="https://images.unsplash.com/photo-1618424181497-157f25b64623?q=80&w=400&auto=format&fit=crop" // Złota folia
+                      finishPercent={60} // Wybuchnie po zdrapaniu 60%
+                      onComplete={handleScratchComplete}
+                    >
+                      {/* To, co jest ukryte POD zdrapką */}
+                      <div className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-amber-50 text-red-950 p-6 flex flex-col justify-center items-center text-center w-[320px] h-[200px] relative">
+                        <div className="absolute top-2 left-2 text-xl opacity-30">🎄</div>
+                        <div className="absolute bottom-2 right-2 text-xl opacity-30">🦌</div>
+                        <h2 className="text-lg font-bold mb-3 text-emerald-800 font-serif uppercase tracking-widest border-b-2 border-emerald-800/20 pb-2">
+                          Świąteczny bon
+                        </h2>
+                        <p className="text-lg italic font-medium font-serif leading-relaxed text-red-950 line-clamp-3 px-2">
+                          "{voucher}"
+                        </p>
+                      </div>
+                    </ScratchCard>
+                  </div>
+                </div>
+              ) : (
+                // Zwykła karta bonu, która pojawia się po zdrapaniu
+                <div className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-amber-50 text-red-950 p-8 rounded-xl shadow-[0_0_40px_rgba(251,191,36,0.3)] text-center w-full border-4 border-double border-red-900 relative mb-6 animate-fade-in">
+                  <div className="absolute top-2 left-2 text-2xl opacity-30">🎄</div>
+                  <div className="absolute bottom-2 right-2 text-2xl opacity-30">🦌</div>
+                  <h2 className="text-xl font-bold mb-4 text-emerald-800 font-serif uppercase tracking-widest border-b-2 border-emerald-800/20 pb-4">
+                    Twój świąteczny bon
+                  </h2>
+                  <p className="text-2xl italic font-medium font-serif leading-relaxed text-red-950">
+                    "{voucher}"
+                  </p>
+                </div>
+              )}
 
             </div>
           )}
         </div>
         
-        {hasDrawn && (
-          <div className="flex flex-col items-center gap-6 z-10 mt-6 w-full max-w-md">
+        {/* PANEL AKCJI WIDOCZNY TYLKO JEŚLI ZDRAPKA ZOSTAŁA UKOŃCZONA */}
+        {hasDrawn && isScratched && (
+          <div className="flex flex-col items-center gap-6 z-10 mt-2 w-full max-w-md animate-fade-in">
             
-            {/* SYSTEM REAKCJI */}
             <div className="bg-red-950/40 p-4 rounded-2xl border border-red-800 w-full text-center backdrop-blur-sm">
               {!reaction ? (
                 <>
@@ -227,7 +259,6 @@ export default function App() {
               )}
             </div>
 
-            {/* PRZYCISK ZREALIZOWANE */}
             {!isCompleted ? (
               <button 
                 onClick={handleComplete}
@@ -259,7 +290,7 @@ export default function App() {
         <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-6 backdrop-blur-md">
           <p className="text-amber-400 font-bold mb-6 text-center text-lg animate-pulse font-serif">👇 Przytrzymaj obrazek palcem, aby zapisać 👇</p>
           <img src={generatedImage} alt="Bon" className="max-h-[65vh] rounded-xl border-2 border-amber-400/50" />
-          <button onClick={() => setGeneratedImage(null)} className="mt-10 bg-red-700 hover:bg-red-600 text-white font-bold py-4 px-10 rounded-full border border-red-500 transition-colors shadow-lg text-lg">✖ Zamknij</button>
+          <button onClick={() => setGeneratedImage(null)} className="mt-10 bg-red-700 text-white font-bold py-4 px-10 rounded-full border border-red-500 transition-colors shadow-lg text-lg">✖ Zamknij</button>
         </div>
       )}
     </>
