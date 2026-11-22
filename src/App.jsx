@@ -6,6 +6,39 @@ import html2canvas from 'html2canvas';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
 import ScratchCard from 'react-scratchcard-v2'; 
+import Snowfall from 'react-snowfall';
+
+// WŁASNY HOOK: Efekt maszyny do pisania z dźwiękiem
+const useTypewriter = (text, speed = 40, startTyping = false) => {
+  const [displayedText, setDisplayedText] = useState('');
+  
+  useEffect(() => {
+    if (!startTyping || !text) return;
+    
+    let i = 0;
+    setDisplayedText('');
+    const typingAudio = new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_c8c8a73467.mp3');
+    typingAudio.volume = 0.1;
+    typingAudio.loop = true;
+    typingAudio.play().catch(() => {}); // Ciche klikanie w tle
+
+    const interval = setInterval(() => {
+      setDisplayedText(text.substring(0, i + 1));
+      i++;
+      if (i === text.length) {
+        clearInterval(interval);
+        typingAudio.pause();
+      }
+    }, speed);
+    
+    return () => {
+      clearInterval(interval);
+      typingAudio.pause();
+    };
+  }, [text, speed, startTyping]);
+  
+  return displayedText;
+};
 
 export default function App() {
   const { dayId } = useParams();
@@ -20,9 +53,9 @@ export default function App() {
   const [reaction, setReaction] = useState(null);
   const [isCompleted, setIsCompleted] = useState(false);
   
-  // Stany minigry
   const [trivia, setTrivia] = useState(null);
   const [triviaError, setTriviaError] = useState(false);
+  const [startTyping, setStartTyping] = useState(false);
   
   const [hasDrawn, setHasDrawn] = useState(false);
   const [isScratched, setIsScratched] = useState(false);
@@ -37,6 +70,9 @@ export default function App() {
 
   const isLocked = !isTestMode && (realMonth < 11 || (realMonth === 11 && realDate < currentDay));
 
+  // Hook maszyny do pisania odpala się tylko gdy załadujemy zagadkę
+  const typedQuestion = useTypewriter(trivia?.q || '', 45, startTyping);
+
   useEffect(() => {
     const fetchVoucherData = async () => {
       try {
@@ -49,15 +85,8 @@ export default function App() {
           setReaction(data.reaction || null);
           setIsCompleted(data.isCompleted || false);
           
-          // Pobieranie zagadki, jeśli istnieje
           if (data.question && data.ansA && data.ansB && data.ansC) {
-            setTrivia({
-              q: data.question,
-              A: data.ansA,
-              B: data.ansB,
-              C: data.ansC,
-              correct: data.correctAns || 'A'
-            });
+            setTrivia({ q: data.question, A: data.ansA, B: data.ansB, C: data.ansC, correct: data.correctAns || 'A' });
           }
         }
       } catch (e) {
@@ -74,6 +103,7 @@ export default function App() {
         setVoucher(null);
         setHasDrawn(false);
         setIsScratched(false);
+        setStartTyping(true); // Zaczynamy pisanie zagadki, jeśli jej jeszcze nie rozwiązała
       }
     };
     fetchVoucherData();
@@ -82,23 +112,19 @@ export default function App() {
   const playMagicSound = () => {
     const audio = new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_24e20f1883.mp3');
     audio.volume = 0.5;
-    audio.play().catch(e => console.log("Brak autoodtwarzania", e));
+    audio.play().catch(() => {});
   };
 
   const playErrorSound = () => {
-    // Krótki dźwięk błędu
     const audio = new Audio('https://cdn.pixabay.com/audio/2021/08/04/audio_c6ccf3232f.mp3');
     audio.volume = 0.4;
-    audio.play().catch(e => console.log(e));
+    audio.play().catch(() => {});
   }
 
-  // Funkcja wywoływana, gdy zaznaczy odpowiedź w minigrze
   const handleTriviaAnswer = (selected) => {
     if (selected === trivia.correct) {
-      // Dobra odpowiedź! Generujemy bon.
       drawVoucher();
     } else {
-      // Zła odpowiedź
       playErrorSound();
       setTriviaError(true);
       setTimeout(() => setTriviaError(false), 2000);
@@ -111,21 +137,18 @@ export default function App() {
       const docRef = doc(db, "vouchers", currentDay.toString());
       const docSnap = await getDoc(docRef);
 
-      let todayOptions = ["Brak bonu. Mikołaj zapomniał dodać go do bazy! 🎅"];
+      let todayOptions = ["Brak bonu w bazie! 🎅"];
       if (docSnap.exists() && docSnap.data().options?.length > 0) {
         todayOptions = docSnap.data().options;
       }
 
-      const randomIndex = Math.floor(Math.random() * todayOptions.length);
-      const selectedVoucher = todayOptions[randomIndex];
-
+      const selectedVoucher = todayOptions[Math.floor(Math.random() * todayOptions.length)];
       setVoucher(selectedVoucher);
       setHasDrawn(true);
       setIsScratched(false); 
       
       const storageKey = isTestMode ? `test_voucher_day_${currentDay}` : `voucher_day_${currentDay}`;
       localStorage.setItem(storageKey, selectedVoucher);
-      
     } catch (error) {
       alert("Błąd połączenia z bazą danych.");
     } finally {
@@ -158,32 +181,30 @@ export default function App() {
       await updateDoc(docRef, { isCompleted: true });
       setIsCompleted(true);
       playMagicSound();
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
   };
 
   const shareAsImage = async () => {
     if (!captureRef.current) return;
     try {
-      const canvas = await html2canvas(captureRef.current, { backgroundColor: '#450a0a', scale: 2, useCORS: true });
-      const base64image = canvas.toDataURL("image/png");
-      setGeneratedImage(base64image);
+      const canvas = await html2canvas(captureRef.current, { backgroundColor: '#1a0505', scale: 2, useCORS: true });
+      setGeneratedImage(canvas.toDataURL("image/png"));
     } catch (error) {}
   };
 
   if (isNaN(currentDay) || currentDay < 1 || currentDay > 24) {
-    return <div className="min-h-screen bg-gradient-to-br from-red-900 to-emerald-950 flex items-center justify-center"><div className="text-amber-400 text-2xl font-bold font-serif">Nieprawidłowy dzień! 🎁</div></div>;
+    return <div className="min-h-screen bg-black flex items-center justify-center"><div className="text-amber-400 text-2xl font-bold">Nieprawidłowy dzień! 🎁</div></div>;
   }
 
   if (isLocked) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-900 via-red-950 to-emerald-950 flex items-center justify-center p-4">
-        <div className="bg-red-950/80 backdrop-blur-sm p-8 rounded-3xl text-center max-w-md w-full border-2 border-red-800 shadow-xl">
-          <h2 className="text-6xl mb-4 animate-bounce">🎁</h2>
+      <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-900 via-red-950 to-emerald-950 flex items-center justify-center p-4">
+        <Snowfall color="#fde047" snowflakeCount={50} style={{ opacity: 0.3 }} />
+        <div className="bg-black/40 backdrop-blur-2xl p-10 rounded-3xl text-center max-w-md w-full border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] z-10">
+          <h2 className="text-6xl mb-6 animate-bounce">🎁</h2>
           <h2 className="text-3xl font-bold text-amber-400 mb-4 font-serif">Jeszcze nie czas!</h2>
-          <p className="text-red-200 text-lg mb-8 italic">Ten prezent otworzy się dopiero <strong>{currentDay} grudnia</strong>.</p>
-          <Link to="/" className="inline-block bg-gradient-to-r from-emerald-700 to-emerald-900 text-amber-300 font-bold py-3 px-8 rounded-full border border-emerald-500">Wróć do kalendarza</Link>
+          <p className="text-amber-100/70 text-lg mb-8 italic">Ten prezent otworzy się dopiero <strong>{currentDay} grudnia</strong>.</p>
+          <Link to="/" className="inline-block bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-8 rounded-full border border-white/20 transition-all">Wróć do kalendarza</Link>
         </div>
       </div>
     );
@@ -191,69 +212,92 @@ export default function App() {
 
   return (
     <>
-      {showConfetti && <Confetti width={width} height={height} recycle={false} numberOfPieces={500} gravity={0.2} />}
+      {showConfetti && <Confetti width={width} height={height} recycle={false} numberOfPieces={600} gravity={0.15} colors={['#fde047', '#10b981', '#ef4444', '#ffffff']} />}
 
-      <div className="min-h-screen bg-gradient-to-br from-red-900 via-red-950 to-emerald-950 flex flex-col items-center justify-center p-4 relative overflow-hidden pb-20">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(251,191,36,0.15)_0%,_transparent_60%)] pointer-events-none"></div>
+      <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-900 via-red-950 to-emerald-950 flex flex-col items-center justify-center p-4 relative overflow-hidden pb-20 font-sans">
+        
+        <Snowfall color="#ffffff" snowflakeCount={80} style={{ opacity: 0.4, zIndex: 0 }} />
 
         <div ref={captureRef} className="flex flex-col items-center w-full z-10 pt-8 pb-4 px-4 rounded-3xl">
-          {isTestMode && <div className="text-red-400 font-bold mb-2 text-sm">TRYB TESTOWY</div>}
+          {isTestMode && <div className="bg-red-500/20 text-red-300 border border-red-500/50 px-4 py-1 rounded-full font-bold mb-4 text-xs tracking-widest backdrop-blur-sm">TRYB TESTOWY</div>}
           
-          <h1 className="text-5xl md:text-6xl text-amber-400 font-extrabold mb-8 drop-shadow-[0_0_15px_rgba(251,191,36,0.6)] font-serif">
+          <h1 className="text-5xl md:text-7xl text-transparent bg-clip-text bg-gradient-to-b from-amber-200 to-amber-500 font-extrabold mb-10 font-serif drop-shadow-[0_5px_15px_rgba(251,191,36,0.2)]">
             Grudzień {currentDay}
           </h1>
           
-          {/* LOGIKA WYŚWIETLANIA: MINIGRA -> ZDRAPKA -> BON */}
           {!hasDrawn ? (
             trivia ? (
-              // WIDOK ZAGADKI
-              <div className="bg-indigo-950/80 border-2 border-indigo-500/50 p-6 rounded-2xl max-w-md w-full text-center shadow-[0_0_30px_rgba(79,70,229,0.4)] backdrop-blur-sm">
-                <h2 className="text-indigo-300 font-bold uppercase tracking-widest text-sm mb-4">Mikołaj sprawdza wiedzę 🧩</h2>
-                <p className="text-xl text-white font-serif italic mb-8">"{trivia.q}"</p>
+              // FANCY WIDOK ZAGADKI Z MASZYNĄ DO PISANIA
+              <div className="bg-black/40 backdrop-blur-xl border border-white/10 p-8 rounded-3xl max-w-md w-full text-center shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-400 to-transparent opacity-50"></div>
+                
+                <h2 className="text-amber-400/80 font-bold uppercase tracking-widest text-xs mb-6 flex items-center justify-center gap-2">
+                  <span>🕵️</span> Mikołaj pyta
+                </h2>
+                
+                <div className="min-h-[80px] flex items-center justify-center mb-8">
+                  <p className="text-xl text-white font-serif italic leading-relaxed">
+                    "{typedQuestion}"
+                    <span className="animate-pulse ml-1 text-amber-400">|</span>
+                  </p>
+                </div>
                 
                 <div className="flex flex-col gap-3">
-                  <button onClick={() => handleTriviaAnswer('A')} className="bg-indigo-600/50 hover:bg-indigo-500 text-indigo-100 font-bold py-3 px-6 rounded-xl border border-indigo-400 transition-colors">{trivia.A}</button>
-                  <button onClick={() => handleTriviaAnswer('B')} className="bg-indigo-600/50 hover:bg-indigo-500 text-indigo-100 font-bold py-3 px-6 rounded-xl border border-indigo-400 transition-colors">{trivia.B}</button>
-                  <button onClick={() => handleTriviaAnswer('C')} className="bg-indigo-600/50 hover:bg-indigo-500 text-indigo-100 font-bold py-3 px-6 rounded-xl border border-indigo-400 transition-colors">{trivia.C}</button>
+                  <button onClick={() => handleTriviaAnswer('A')} className="group relative bg-white/5 hover:bg-white/10 text-amber-50 font-medium py-4 px-6 rounded-2xl border border-white/10 transition-all text-left flex items-center overflow-hidden">
+                    <span className="bg-white/10 px-3 py-1 rounded-lg mr-4 font-bold text-amber-400">A</span>
+                    {trivia.A}
+                  </button>
+                  <button onClick={() => handleTriviaAnswer('B')} className="group relative bg-white/5 hover:bg-white/10 text-amber-50 font-medium py-4 px-6 rounded-2xl border border-white/10 transition-all text-left flex items-center overflow-hidden">
+                    <span className="bg-white/10 px-3 py-1 rounded-lg mr-4 font-bold text-amber-400">B</span>
+                    {trivia.B}
+                  </button>
+                  <button onClick={() => handleTriviaAnswer('C')} className="group relative bg-white/5 hover:bg-white/10 text-amber-50 font-medium py-4 px-6 rounded-2xl border border-white/10 transition-all text-left flex items-center overflow-hidden">
+                    <span className="bg-white/10 px-3 py-1 rounded-lg mr-4 font-bold text-amber-400">C</span>
+                    {trivia.C}
+                  </button>
                 </div>
 
                 {triviaError && (
-                  <p className="text-red-400 font-bold mt-6 animate-bounce">❌ Zła odpowiedź, spróbuj jeszcze raz!</p>
+                  <p className="text-red-400 font-bold mt-6 animate-pulse bg-red-900/30 py-2 rounded-lg border border-red-500/30">
+                    ❌ Ups, to nie to! Spróbuj jeszcze raz.
+                  </p>
                 )}
               </div>
             ) : (
-              // ZWYKŁY PRZYCISK JEŚLI BRAK ZAGADKI
-              <button onClick={drawVoucher} disabled={isLoading} className="bg-gradient-to-br from-emerald-600 to-emerald-800 hover:from-emerald-500 text-amber-300 font-bold py-5 px-10 rounded-full shadow-[0_0_20px_rgba(4,120,87,0.6)] transition-all transform hover:scale-105 font-serif text-xl">
-                {isLoading ? "Rozwiązywanie wstążki..." : "Odkryj dzisiejszy prezent 🎀"}
+              <button onClick={drawVoucher} disabled={isLoading} className="bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 text-white font-bold py-5 px-12 rounded-full shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all transform hover:scale-105 hover:-translate-y-1 font-serif text-xl border border-emerald-400/50 flex items-center gap-3">
+                {isLoading ? "Rozwiązywanie wstążki..." : <>Odkryj prezent <span className="text-2xl">🎀</span></>}
               </button>
             )
           ) : (
             <div className="flex flex-col items-center w-full max-w-md">
               {photoUrl && (
-                <div className="bg-white p-3 pb-6 rounded-sm shadow-2xl transform -rotate-2 hover:rotate-0 transition-transform mb-6 border border-slate-200 flex flex-col items-center w-auto max-w-full mx-auto">
-                  <img src={photoUrl} alt="Wspomnienie" className="w-auto h-auto max-w-full max-h-[50vh] border border-slate-100" crossOrigin="anonymous" />
-                  <p className="text-center text-slate-800 font-serif mt-4 text-lg italic">Wspomnienie roku</p>
+                <div className="bg-white p-3 pb-8 rounded-sm shadow-2xl transform -rotate-1 hover:rotate-1 transition-transform duration-500 mb-8 w-auto max-w-full mx-auto relative group">
+                  <div className="absolute inset-0 shadow-[inset_0_0_20px_rgba(0,0,0,0.1)] pointer-events-none"></div>
+                  <img src={photoUrl} alt="Wspomnienie" className="w-auto h-auto max-w-full max-h-[45vh] border border-slate-100 object-cover" crossOrigin="anonymous" />
+                  <p className="text-center text-slate-800 font-serif mt-5 text-xl italic opacity-80 group-hover:opacity-100 transition-opacity">Nasze wspomnienie</p>
                 </div>
               )}
 
               {!isScratched ? (
                 <div className="w-full flex flex-col items-center animate-fade-in mb-6">
-                  <p className="text-amber-300 font-serif mb-4 animate-pulse font-bold text-lg text-center">👇 Zdrap złotą folię palcem! 👇</p>
-                  <div className="rounded-xl overflow-hidden shadow-[0_0_30px_rgba(251,191,36,0.4)] border-4 border-amber-500 bg-amber-50">
+                  <p className="text-amber-300 font-serif mb-5 animate-pulse font-bold text-lg text-center flex items-center gap-2">
+                    <span>✨</span> Zdrap złotą folię palcem! <span>✨</span>
+                  </p>
+                  <div className="rounded-2xl overflow-hidden shadow-[0_10px_40px_rgba(251,191,36,0.3)] border-4 border-amber-500/80 bg-amber-50 transform hover:scale-[1.02] transition-transform duration-300 cursor-pointer">
                     <ScratchCard width={320} height={200} image="https://images.unsplash.com/photo-1618424181497-157f25b64623?q=80&w=400&auto=format&fit=crop" finishPercent={60} onComplete={handleScratchComplete}>
                       <div className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] text-red-950 p-6 flex flex-col justify-center items-center text-center w-[320px] h-[200px] relative">
-                        <h2 className="text-lg font-bold mb-3 text-emerald-800 font-serif uppercase tracking-widest border-b-2 border-emerald-800/20 pb-2">Świąteczny bon</h2>
-                        <p className="text-lg italic font-medium font-serif leading-relaxed text-red-950 line-clamp-3 px-2">"{voucher}"</p>
+                        <h2 className="text-sm font-bold mb-3 text-emerald-800 font-serif uppercase tracking-widest border-b border-emerald-800/20 pb-2">Świąteczny bon</h2>
+                        <p className="text-xl italic font-medium font-serif leading-snug text-red-950 px-2 drop-shadow-sm">"{voucher}"</p>
                       </div>
                     </ScratchCard>
                   </div>
                 </div>
               ) : (
-                <div className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-amber-50 text-red-950 p-8 rounded-xl shadow-[0_0_40px_rgba(251,191,36,0.3)] text-center w-full border-4 border-double border-red-900 relative mb-6 animate-fade-in">
-                  <div className="absolute top-2 left-2 text-2xl opacity-30">🎄</div>
-                  <div className="absolute bottom-2 right-2 text-2xl opacity-30">🦌</div>
-                  <h2 className="text-xl font-bold mb-4 text-emerald-800 font-serif uppercase tracking-widest border-b-2 border-emerald-800/20 pb-4">Twój świąteczny bon</h2>
-                  <p className="text-2xl italic font-medium font-serif leading-relaxed text-red-950">"{voucher}"</p>
+                <div className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-amber-50 text-red-950 p-10 rounded-2xl shadow-[0_15px_50px_rgba(0,0,0,0.4)] text-center w-full relative mb-6 animate-fade-in border-4 border-double border-emerald-900/30">
+                  <h2 className="text-sm font-bold mb-5 text-emerald-800 font-serif uppercase tracking-widest border-b-2 border-emerald-800/20 pb-3 flex justify-center items-center gap-3">
+                    <span>🎄</span> Twój prezent <span>🎄</span>
+                  </h2>
+                  <p className="text-3xl italic font-medium font-serif leading-relaxed text-red-950 drop-shadow-sm">"{voucher}"</p>
                 </div>
               )}
             </div>
@@ -261,42 +305,52 @@ export default function App() {
         </div>
         
         {hasDrawn && isScratched && (
-          <div className="flex flex-col items-center gap-6 z-10 mt-2 w-full max-w-md animate-fade-in">
-            <div className="bg-red-950/40 p-4 rounded-2xl border border-red-800 w-full text-center backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-5 z-10 mt-2 w-full max-w-md animate-fade-in">
+            
+            <div className="bg-black/30 p-5 rounded-3xl border border-white/10 w-full text-center backdrop-blur-md shadow-xl">
               {!reaction ? (
                 <>
-                  <p className="text-amber-200 mb-3 font-serif text-sm">Jak Ci się podoba ten bon?</p>
-                  <div className="flex justify-center gap-4 text-4xl">
-                    <button onClick={() => handleReaction('😍')} className="hover:scale-125 transition-transform">😍</button>
-                    <button onClick={() => handleReaction('😂')} className="hover:scale-125 transition-transform">😂</button>
-                    <button onClick={() => handleReaction('🤔')} className="hover:scale-125 transition-transform">🤔</button>
+                  <p className="text-amber-100/80 mb-4 font-serif text-sm">Zostaw reakcję dla Mikołaja:</p>
+                  <div className="flex justify-center gap-6 text-4xl">
+                    <button onClick={() => handleReaction('😍')} className="hover:scale-125 hover:-translate-y-2 transition-all filter drop-shadow-lg">😍</button>
+                    <button onClick={() => handleReaction('😂')} className="hover:scale-125 hover:-translate-y-2 transition-all filter drop-shadow-lg">😂</button>
+                    <button onClick={() => handleReaction('🥺')} className="hover:scale-125 hover:-translate-y-2 transition-all filter drop-shadow-lg">🥺</button>
                   </div>
                 </>
               ) : (
-                <p className="text-amber-300 font-serif text-lg">Moja reakcja: <span className="text-2xl ml-2">{reaction}</span></p>
+                <p className="text-amber-200 font-serif text-lg flex items-center justify-center gap-3">
+                  Wysłano: <span className="text-3xl animate-bounce">{reaction}</span>
+                </p>
               )}
             </div>
 
             {!isCompleted ? (
-              <button onClick={handleComplete} className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-all transform hover:scale-105 border border-emerald-400 text-lg flex items-center justify-center gap-2">
-                <span>🎯</span> Oznacz jako ZREALIZOWANY
+              <button onClick={handleComplete} className="w-full bg-emerald-600/80 hover:bg-emerald-500 backdrop-blur-md text-white font-bold py-4 px-8 rounded-2xl shadow-xl transition-all transform hover:scale-[1.02] border border-emerald-400/50 text-lg flex items-center justify-center gap-3 group">
+                <span className="text-2xl group-hover:scale-125 transition-transform">🎯</span> Oznacz jako ZREALIZOWANY
               </button>
             ) : (
-              <div className="w-full bg-emerald-900/60 border-2 border-emerald-500 text-emerald-300 font-bold py-4 px-8 rounded-xl text-center text-lg flex items-center justify-center gap-2">
-                <span>✅</span> Ten bon został zrealizowany!
+              <div className="w-full bg-emerald-900/60 backdrop-blur-md border border-emerald-500/50 text-emerald-200 font-bold py-4 px-8 rounded-2xl text-center text-lg flex items-center justify-center gap-3 shadow-inner">
+                <span className="text-2xl">✅</span> Zrealizowano!
               </div>
             )}
-            <button onClick={shareAsImage} className="mt-4 bg-red-800/50 hover:bg-red-700 text-amber-100 font-bold py-3 px-8 rounded-full shadow-lg transition-colors flex items-center gap-2 border border-red-600">📸 Zapisz / Wyślij obrazek</button>
-            <Link to={isTestMode ? "/test" : "/"} className="text-sm text-red-300 hover:text-amber-300 font-bold underline">Wróć do kalendarza</Link>
+            
+            <div className="flex w-full gap-3 mt-2">
+              <button onClick={shareAsImage} className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 border border-white/10 backdrop-blur-md text-sm">
+                📸 Zapisz Pamiątkę
+              </button>
+              <Link to={isTestMode ? "/test" : "/"} className="flex-1 bg-white/5 hover:bg-white/10 text-white/70 hover:text-white font-medium py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 border border-white/10 backdrop-blur-md text-sm">
+                Wróć do bazy
+              </Link>
+            </div>
           </div>
         )}
       </div>
 
       {generatedImage && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-6 backdrop-blur-md">
-          <p className="text-amber-400 font-bold mb-6 text-center text-lg animate-pulse font-serif">👇 Przytrzymaj obrazek palcem, aby zapisać 👇</p>
-          <img src={generatedImage} alt="Bon" className="max-h-[65vh] rounded-xl border-2 border-amber-400/50" />
-          <button onClick={() => setGeneratedImage(null)} className="mt-10 bg-red-700 hover:bg-red-600 text-white font-bold py-4 px-10 rounded-full border border-red-500 transition-colors shadow-lg text-lg">✖ Zamknij</button>
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col items-center justify-center p-6 backdrop-blur-xl">
+          <p className="text-amber-400 font-bold mb-8 text-center text-xl animate-pulse font-serif tracking-wide">👇 Przytrzymaj obrazek palcem 👇</p>
+          <img src={generatedImage} alt="Bon" className="max-h-[60vh] rounded-2xl shadow-[0_0_50px_rgba(251,191,36,0.3)] border border-amber-400/30" />
+          <button onClick={() => setGeneratedImage(null)} className="mt-12 bg-white/10 hover:bg-white/20 text-white font-bold py-4 px-12 rounded-full border border-white/20 transition-all shadow-2xl tracking-widest uppercase text-sm">Zamknij</button>
         </div>
       )}
     </>
