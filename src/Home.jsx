@@ -3,24 +3,47 @@ import { Link } from 'react-router-dom';
 
 export default function Home() {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [countdownMessage, setCountdownMessage] = useState("Obliczanie czasu...");
+  const [allUnlocked, setAllUnlocked] = useState(false);
 
   useEffect(() => {
-    // Ustawiamy datę Wigilii na ten rok
-    const targetDate = new Date("2026-12-24T00:00:00");
-    
     const interval = setInterval(() => {
       const now = new Date();
-      const diff = targetDate - now;
-      
-      if (diff > 0) {
-        setTimeLeft({
-          days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-          minutes: Math.floor((diff / 1000 / 60) % 60),
-          seconds: Math.floor((diff / 1000) % 60)
-        });
+      let targetDate = null;
+      let message = "";
+
+      if (now.getMonth() < 11) {
+        // Jesteśmy przed grudniem -> odliczamy do 1 grudnia tego samego roku, godzina 00:00
+        targetDate = new Date(now.getFullYear(), 11, 1, 0, 0, 0);
+        message = "Pierwszy prezent odblokuje się za:";
+      } else if (now.getMonth() === 11 && now.getDate() < 24) {
+        // Jesteśmy w grudniu (przed 24.) -> odliczamy do północy następnego dnia
+        targetDate = new Date(now.getFullYear(), 11, now.getDate() + 1, 0, 0, 0);
+        message = "Kolejny prezent odblokuje się za:";
+      } else {
+        // Jest 24 grudnia lub później
+        targetDate = null;
+        message = "Wszystkie prezenty są już dostępne! 🎅";
+        setAllUnlocked(true);
+      }
+
+      if (targetDate) {
+        const diff = targetDate - now;
+        if (diff > 0) {
+          setTimeLeft({
+            days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+            hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+            minutes: Math.floor((diff / 1000 / 60) % 60),
+            seconds: Math.floor((diff / 1000) % 60)
+          });
+          setCountdownMessage(message);
+          setAllUnlocked(false);
+        }
+      } else {
+        setCountdownMessage(message);
       }
     }, 1000);
+    
     return () => clearInterval(interval);
   }, []);
 
@@ -38,15 +61,27 @@ export default function Home() {
         🎄 Kalendarz 🎄
       </h1>
       
-      {/* NOWE: Odliczanie do Wigilii */}
-      <div className="flex gap-2 text-amber-200 z-10 mb-8 font-serif bg-red-950/50 p-4 rounded-xl border border-red-800/50 backdrop-blur-sm">
-        <div className="text-center"><span className="text-2xl font-bold">{timeLeft.days}</span><div className="text-xs uppercase">Dni</div></div>
-        <div className="text-2xl font-bold">:</div>
-        <div className="text-center"><span className="text-2xl font-bold">{timeLeft.hours}</span><div className="text-xs uppercase">Godz</div></div>
-        <div className="text-2xl font-bold">:</div>
-        <div className="text-center"><span className="text-2xl font-bold">{timeLeft.minutes}</span><div className="text-xs uppercase">Min</div></div>
-        <div className="text-2xl font-bold">:</div>
-        <div className="text-center"><span className="text-2xl font-bold">{timeLeft.seconds}</span><div className="text-xs uppercase">Sek</div></div>
+      {/* Dynamiczne odliczanie */}
+      <div className="flex flex-col items-center z-10 mb-8 font-serif bg-red-950/50 p-4 rounded-xl border border-red-800/50 backdrop-blur-sm mt-4">
+        <div className="text-amber-300 text-sm md:text-base mb-3 font-bold tracking-wider uppercase text-center">
+          {countdownMessage}
+        </div>
+        
+        {!allUnlocked && (
+          <div className="flex gap-3 md:gap-4 text-amber-200">
+            {timeLeft.days > 0 && (
+              <>
+                <div className="text-center"><span className="text-3xl font-bold">{timeLeft.days}</span><div className="text-xs uppercase">Dni</div></div>
+                <div className="text-3xl font-bold opacity-50">:</div>
+              </>
+            )}
+            <div className="text-center"><span className="text-3xl font-bold">{timeLeft.hours.toString().padStart(2, '0')}</span><div className="text-xs uppercase">Godz</div></div>
+            <div className="text-3xl font-bold opacity-50">:</div>
+            <div className="text-center"><span className="text-3xl font-bold">{timeLeft.minutes.toString().padStart(2, '0')}</span><div className="text-xs uppercase">Min</div></div>
+            <div className="text-3xl font-bold opacity-50">:</div>
+            <div className="text-center"><span className="text-3xl font-bold">{timeLeft.seconds.toString().padStart(2, '0')}</span><div className="text-xs uppercase">Sek</div></div>
+          </div>
+        )}
       </div>
       
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4 max-w-4xl w-full z-10">
