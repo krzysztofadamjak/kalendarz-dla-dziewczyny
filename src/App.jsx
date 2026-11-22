@@ -188,7 +188,7 @@ export default function App() {
                     className="w-auto h-auto max-w-full max-h-[50vh] border border-slate-100" 
                     crossOrigin="anonymous" 
                   />
-                  <p className="text-center text-slate-800 font-serif mt-4 text-lg italic">Wspomnienie roku</p>
+                  <p className="text-center text-slate-800 font-serif mt-4 text-lg italic">Wspominanka</p>
                 </div>
               )}
 
