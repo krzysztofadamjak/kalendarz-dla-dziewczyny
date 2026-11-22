@@ -4,13 +4,14 @@ import { db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
 export default function App() {
-  const { dayId } = useParams(); // Odczytuje numer dnia z adresu (np. /dzien/1)
+  const { dayId } = useParams(); // Pobiera np. "5" z /dzien/5
   const currentDay = parseInt(dayId, 10);
   
   const [voucher, setVoucher] = useState(null);
   const [hasDrawn, setHasDrawn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Sprawdzamy, czy danego dnia już losowała
   useEffect(() => {
     const saved = localStorage.getItem(`voucher_day_${currentDay}`);
     if (saved) {
@@ -35,30 +36,39 @@ export default function App() {
         todayOptions = docSnap.data().options;
       }
 
-      // Losowanie jednej opcji
+      // Losowanie jednej z pobranych opcji
       const randomIndex = Math.floor(Math.random() * todayOptions.length);
       const selectedVoucher = todayOptions[randomIndex];
 
       setVoucher(selectedVoucher);
       setHasDrawn(true);
+      
+      // Zapisujemy wynik do pamięci przeglądarki
       localStorage.setItem(`voucher_day_${currentDay}`, selectedVoucher);
       
     } catch (error) {
       console.error("Błąd bazy:", error);
-      alert("Błąd połączenia z bazą danych.");
+      alert("Błąd połączenia z bazą danych. Spróbuj odświeżyć stronę.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Blokada dla nieistniejących dni (np. /dzien/30)
+  // Zabezpieczenie przed wpisaniem /dzien/30
   if (isNaN(currentDay) || currentDay < 1 || currentDay > 24) {
-    return <div className="text-white text-center mt-20 text-2xl">Nieprawidłowy dzień! Zeskanuj poprawny kod.</div>;
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="text-white text-center text-2xl font-bold">
+          Nieprawidłowy dzień! Zeskanuj poprawny kod z kalendarza.
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
       <h1 className="text-4xl text-white font-bold mb-8">Grudzień {currentDay}</h1>
+      
       {!hasDrawn ? (
         <button 
           onClick={drawVoucher}
@@ -68,7 +78,7 @@ export default function App() {
           {isLoading ? "Odbieranie od Mikołaja..." : "Odkryj dzisiejszy prezent"}
         </button>
       ) : (
-        <div className="bg-white text-slate-900 p-8 rounded-2xl shadow-2xl text-center max-w-md w-full">
+        <div className="bg-white text-slate-900 p-8 rounded-2xl shadow-2xl text-center max-w-md w-full animate-fade-in">
           <h2 className="text-2xl font-bold mb-4 text-red-600">Twój bon na dziś:</h2>
           <p className="text-xl italic font-medium">"{voucher}"</p>
         </div>
