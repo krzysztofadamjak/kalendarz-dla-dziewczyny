@@ -32,9 +32,15 @@ export default function Home() {
         ))}
       </div>
       
-      <Link to="/admin" className="mt-12 text-red-300/40 hover:text-red-200 text-sm z-10">
-        Panel Admina
-      </Link>
+      <div className="mt-12 flex flex-col md:flex-row gap-6 items-center z-10">
+        <Link to="/regulamin" className="text-amber-300 hover:text-amber-100 font-bold underline font-serif">
+          📜 Przeczytaj Regulamin Kalendarza
+        </Link>
+        
+        <Link to="/admin" className="text-red-300/40 hover:text-red-200 text-sm">
+          Panel Admina
+        </Link>
+      </div>
     </div>
   );
 }
