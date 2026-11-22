@@ -37,7 +37,7 @@ export default function Regulamin() {
         </ol>
 
         <div className="mt-12 text-center border-t-2 border-red-900/20 pt-6">
-          <p className="italic text-emerald-800 font-bold">Podpisano: Mikołaj (Twój chłopak) 🎅</p>
+          <p className="italic text-emerald-800 font-bold">Podpisano: Mikołaj (Twój Stary) 🎅</p>
         </div>
       </div>
 
