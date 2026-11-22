@@ -8,7 +8,7 @@ import { useWindowSize } from 'react-use';
 import ScratchCard from 'react-scratchcard-v2'; 
 import Snowfall from 'react-snowfall';
 
-// WŁASNY HOOK: Efekt maszyny do pisania z dźwiękiem
+// WŁASNY HOOK: Maszyna do pisania
 const useTypewriter = (text, speed = 40, startTyping = false) => {
   const [displayedText, setDisplayedText] = useState('');
   
@@ -20,7 +20,7 @@ const useTypewriter = (text, speed = 40, startTyping = false) => {
     const typingAudio = new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_c8c8a73467.mp3');
     typingAudio.volume = 0.1;
     typingAudio.loop = true;
-    typingAudio.play().catch(() => {}); // Ciche klikanie w tle
+    typingAudio.play().catch(() => {});
 
     const interval = setInterval(() => {
       setDisplayedText(text.substring(0, i + 1));
@@ -53,9 +53,13 @@ export default function App() {
   const [reaction, setReaction] = useState(null);
   const [isCompleted, setIsCompleted] = useState(false);
   
+  // ZAGADKA I GRINCH
   const [trivia, setTrivia] = useState(null);
   const [triviaError, setTriviaError] = useState(false);
   const [startTyping, setStartTyping] = useState(false);
+  
+  // STAN KARY (COOLDOWN)
+  const [grinchTimeLeft, setGrinchTimeLeft] = useState(0);
   
   const [hasDrawn, setHasDrawn] = useState(false);
   const [isScratched, setIsScratched] = useState(false);
@@ -70,8 +74,38 @@ export default function App() {
 
   const isLocked = !isTestMode && (realMonth < 11 || (realMonth === 11 && realDate < currentDay));
 
-  // Hook maszyny do pisania odpala się tylko gdy załadujemy zagadkę
   const typedQuestion = useTypewriter(trivia?.q || '', 45, startTyping);
+
+  // Sprawdzanie pamięci pod kątem trwającej kary Grincha po załadowaniu
+  useEffect(() => {
+    const penaltyEndTime = localStorage.getItem(`grinch_penalty_day_${currentDay}`);
+    if (penaltyEndTime) {
+      const now = new Date().getTime();
+      const diff = parseInt(penaltyEndTime, 10) - now;
+      if (diff > 0) {
+        setGrinchTimeLeft(Math.ceil(diff / 1000));
+      } else {
+        localStorage.removeItem(`grinch_penalty_day_${currentDay}`);
+      }
+    }
+  }, [currentDay]);
+
+  // Logika odliczania kary Grincha
+  useEffect(() => {
+    let timer;
+    if (grinchTimeLeft > 0) {
+      timer = setInterval(() => {
+        setGrinchTimeLeft(prev => {
+          if (prev <= 1) {
+            localStorage.removeItem(`grinch_penalty_day_${currentDay}`);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [grinchTimeLeft, currentDay]);
 
   useEffect(() => {
     const fetchVoucherData = async () => {
@@ -103,7 +137,7 @@ export default function App() {
         setVoucher(null);
         setHasDrawn(false);
         setIsScratched(false);
-        setStartTyping(true); // Zaczynamy pisanie zagadki, jeśli jej jeszcze nie rozwiązała
+        setStartTyping(true); 
       }
     };
     fetchVoucherData();
@@ -115,19 +149,31 @@ export default function App() {
     audio.play().catch(() => {});
   };
 
-  const playErrorSound = () => {
+  const playGrinchSound = () => {
+    // Dźwięk błędu/brzęczyka
     const audio = new Audio('https://cdn.pixabay.com/audio/2021/08/04/audio_c6ccf3232f.mp3');
-    audio.volume = 0.4;
+    audio.volume = 0.5;
     audio.play().catch(() => {});
   }
 
   const handleTriviaAnswer = (selected) => {
+    if (grinchTimeLeft > 0) return; // Zabezpieczenie przed klikaniem w trakcie kary
+
     if (selected === trivia.correct) {
       drawVoucher();
     } else {
-      playErrorSound();
+      // KARA GRINCHA (ZŁA ODPOWIEDŹ)
+      playGrinchSound();
       setTriviaError(true);
-      setTimeout(() => setTriviaError(false), 2000);
+      
+      const penaltyDurationSeconds = 60; // 1 MINUTA KARY
+      setGrinchTimeLeft(penaltyDurationSeconds);
+      
+      // Zapisujemy czas zakończenia kary w pamięci, by odświeżenie strony nie pomogło!
+      const endTime = new Date().getTime() + (penaltyDurationSeconds * 1000);
+      localStorage.setItem(`grinch_penalty_day_${currentDay}`, endTime.toString());
+      
+      setTimeout(() => setTriviaError(false), 3000); // Komunikat o błędzie znika po 3s, ale licznik zostaje
     }
   };
 
@@ -136,17 +182,14 @@ export default function App() {
     try {
       const docRef = doc(db, "vouchers", currentDay.toString());
       const docSnap = await getDoc(docRef);
-
       let todayOptions = ["Brak bonu w bazie! 🎅"];
       if (docSnap.exists() && docSnap.data().options?.length > 0) {
         todayOptions = docSnap.data().options;
       }
-
       const selectedVoucher = todayOptions[Math.floor(Math.random() * todayOptions.length)];
       setVoucher(selectedVoucher);
       setHasDrawn(true);
       setIsScratched(false); 
-      
       const storageKey = isTestMode ? `test_voucher_day_${currentDay}` : `voucher_day_${currentDay}`;
       localStorage.setItem(storageKey, selectedVoucher);
     } catch (error) {
@@ -169,9 +212,7 @@ export default function App() {
       const docRef = doc(db, "vouchers", currentDay.toString());
       await updateDoc(docRef, { reaction: emoji });
       setReaction(emoji);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) {}
   };
 
   const handleComplete = async () => {
@@ -210,57 +251,83 @@ export default function App() {
     );
   }
 
+  // ZMIANA TŁA I ŚNIEGU JEŚLI JEST KARA GRINCHA
+  const isGrinchMode = grinchTimeLeft > 0;
+  const bgGradient = isGrinchMode 
+    ? "from-slate-900 via-slate-950 to-black" // Mroczne, szare tło Grincha
+    : "from-red-900 via-red-950 to-emerald-950"; // Normalne, świąteczne tło
+
   return (
     <>
       {showConfetti && <Confetti width={width} height={height} recycle={false} numberOfPieces={600} gravity={0.15} colors={['#fde047', '#10b981', '#ef4444', '#ffffff']} />}
 
-      <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-900 via-red-950 to-emerald-950 flex flex-col items-center justify-center p-4 relative overflow-hidden pb-20 font-sans">
+      <div className={`min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] ${bgGradient} flex flex-col items-center justify-center p-4 relative overflow-hidden pb-20 font-sans transition-colors duration-1000`}>
         
-        <Snowfall color="#ffffff" snowflakeCount={80} style={{ opacity: 0.4, zIndex: 0 }} />
+        {/* Śnieg: normalnie biały/żółty, podczas kary szary/czarny i gęstszy */}
+        <Snowfall 
+          color={isGrinchMode ? "#475569" : "#ffffff"} 
+          snowflakeCount={isGrinchMode ? 150 : 80} 
+          style={{ opacity: isGrinchMode ? 0.8 : 0.4, zIndex: 0 }} 
+        />
 
         <div ref={captureRef} className="flex flex-col items-center w-full z-10 pt-8 pb-4 px-4 rounded-3xl">
           {isTestMode && <div className="bg-red-500/20 text-red-300 border border-red-500/50 px-4 py-1 rounded-full font-bold mb-4 text-xs tracking-widest backdrop-blur-sm">TRYB TESTOWY</div>}
           
-          <h1 className="text-5xl md:text-7xl text-transparent bg-clip-text bg-gradient-to-b from-amber-200 to-amber-500 font-extrabold mb-10 font-serif drop-shadow-[0_5px_15px_rgba(251,191,36,0.2)]">
+          <h1 className={`text-5xl md:text-7xl font-extrabold mb-10 font-serif drop-shadow-[0_5px_15px_rgba(251,191,36,0.2)] ${isGrinchMode ? 'text-slate-500' : 'text-transparent bg-clip-text bg-gradient-to-b from-amber-200 to-amber-500'}`}>
             Grudzień {currentDay}
           </h1>
           
           {!hasDrawn ? (
             trivia ? (
-              // FANCY WIDOK ZAGADKI Z MASZYNĄ DO PISANIA
-              <div className="bg-black/40 backdrop-blur-xl border border-white/10 p-8 rounded-3xl max-w-md w-full text-center shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-400 to-transparent opacity-50"></div>
+              <div className={`backdrop-blur-xl border p-8 rounded-3xl max-w-md w-full text-center shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative overflow-hidden transition-colors duration-1000 ${isGrinchMode ? 'bg-black/80 border-slate-700' : 'bg-black/40 border-white/10'}`}>
                 
-                <h2 className="text-amber-400/80 font-bold uppercase tracking-widest text-xs mb-6 flex items-center justify-center gap-2">
-                  <span>🕵️</span> Mikołaj pyta
-                </h2>
-                
-                <div className="min-h-[80px] flex items-center justify-center mb-8">
-                  <p className="text-xl text-white font-serif italic leading-relaxed">
-                    "{typedQuestion}"
-                    <span className="animate-pulse ml-1 text-amber-400">|</span>
-                  </p>
-                </div>
-                
-                <div className="flex flex-col gap-3">
-                  <button onClick={() => handleTriviaAnswer('A')} className="group relative bg-white/5 hover:bg-white/10 text-amber-50 font-medium py-4 px-6 rounded-2xl border border-white/10 transition-all text-left flex items-center overflow-hidden">
-                    <span className="bg-white/10 px-3 py-1 rounded-lg mr-4 font-bold text-amber-400">A</span>
-                    {trivia.A}
-                  </button>
-                  <button onClick={() => handleTriviaAnswer('B')} className="group relative bg-white/5 hover:bg-white/10 text-amber-50 font-medium py-4 px-6 rounded-2xl border border-white/10 transition-all text-left flex items-center overflow-hidden">
-                    <span className="bg-white/10 px-3 py-1 rounded-lg mr-4 font-bold text-amber-400">B</span>
-                    {trivia.B}
-                  </button>
-                  <button onClick={() => handleTriviaAnswer('C')} className="group relative bg-white/5 hover:bg-white/10 text-amber-50 font-medium py-4 px-6 rounded-2xl border border-white/10 transition-all text-left flex items-center overflow-hidden">
-                    <span className="bg-white/10 px-3 py-1 rounded-lg mr-4 font-bold text-amber-400">C</span>
-                    {trivia.C}
-                  </button>
-                </div>
+                {isGrinchMode ? (
+                  // WIDOK KARY GRINCHA
+                  <div className="flex flex-col items-center justify-center py-6 animate-fade-in">
+                    <span className="text-7xl mb-6 drop-shadow-[0_0_20px_rgba(34,197,94,0.6)]">🧌</span>
+                    <h2 className="text-emerald-500 font-bold uppercase tracking-widest text-lg mb-2">
+                      Tryb Grincha!
+                    </h2>
+                    <p className="text-slate-300 font-serif italic mb-8">
+                      Mikołaj widzi, że nie uważałaś! <br/>Za karę musisz odczekać.
+                    </p>
+                    <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full">
+                      <p className="text-slate-400 text-xs uppercase tracking-widest mb-2">Blokada systemu</p>
+                      <p className="text-5xl font-mono text-emerald-500 animate-pulse font-bold">{grinchTimeLeft}s</p>
+                    </div>
+                  </div>
+                ) : (
+                  // STANDARDOWY WIDOK ZAGADKI
+                  <>
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-400 to-transparent opacity-50"></div>
+                    <h2 className="text-amber-400/80 font-bold uppercase tracking-widest text-xs mb-6 flex items-center justify-center gap-2">
+                      <span>🕵️</span> Mikołaj pyta
+                    </h2>
+                    <div className="min-h-[80px] flex items-center justify-center mb-8">
+                      <p className="text-xl text-white font-serif italic leading-relaxed">
+                        "{typedQuestion}"
+                        <span className="animate-pulse ml-1 text-amber-400">|</span>
+                      </p>
+                    </div>
+                    
+                    <div className="flex flex-col gap-3">
+                      <button onClick={() => handleTriviaAnswer('A')} className="group relative bg-white/5 hover:bg-white/10 text-amber-50 font-medium py-4 px-6 rounded-2xl border border-white/10 transition-all text-left flex items-center overflow-hidden">
+                        <span className="bg-white/10 px-3 py-1 rounded-lg mr-4 font-bold text-amber-400">A</span>{trivia.A}
+                      </button>
+                      <button onClick={() => handleTriviaAnswer('B')} className="group relative bg-white/5 hover:bg-white/10 text-amber-50 font-medium py-4 px-6 rounded-2xl border border-white/10 transition-all text-left flex items-center overflow-hidden">
+                        <span className="bg-white/10 px-3 py-1 rounded-lg mr-4 font-bold text-amber-400">B</span>{trivia.B}
+                      </button>
+                      <button onClick={() => handleTriviaAnswer('C')} className="group relative bg-white/5 hover:bg-white/10 text-amber-50 font-medium py-4 px-6 rounded-2xl border border-white/10 transition-all text-left flex items-center overflow-hidden">
+                        <span className="bg-white/10 px-3 py-1 rounded-lg mr-4 font-bold text-amber-400">C</span>{trivia.C}
+                      </button>
+                    </div>
 
-                {triviaError && (
-                  <p className="text-red-400 font-bold mt-6 animate-pulse bg-red-900/30 py-2 rounded-lg border border-red-500/30">
-                    ❌ Ups, to nie to! Spróbuj jeszcze raz.
-                  </p>
+                    {triviaError && (
+                      <p className="text-red-400 font-bold mt-6 animate-pulse bg-red-900/30 py-2 rounded-lg border border-red-500/30">
+                        ❌ Błędna odpowiedź! Uruchamiam procedurę kary...
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             ) : (
@@ -306,7 +373,6 @@ export default function App() {
         
         {hasDrawn && isScratched && (
           <div className="flex flex-col items-center gap-5 z-10 mt-2 w-full max-w-md animate-fade-in">
-            
             <div className="bg-black/30 p-5 rounded-3xl border border-white/10 w-full text-center backdrop-blur-md shadow-xl">
               {!reaction ? (
                 <>
@@ -323,7 +389,6 @@ export default function App() {
                 </p>
               )}
             </div>
-
             {!isCompleted ? (
               <button onClick={handleComplete} className="w-full bg-emerald-600/80 hover:bg-emerald-500 backdrop-blur-md text-white font-bold py-4 px-8 rounded-2xl shadow-xl transition-all transform hover:scale-[1.02] border border-emerald-400/50 text-lg flex items-center justify-center gap-3 group">
                 <span className="text-2xl group-hover:scale-125 transition-transform">🎯</span> Oznacz jako ZREALIZOWANY
@@ -333,7 +398,6 @@ export default function App() {
                 <span className="text-2xl">✅</span> Zrealizowano!
               </div>
             )}
-            
             <div className="flex w-full gap-3 mt-2">
               <button onClick={shareAsImage} className="flex-1 bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 border border-white/10 backdrop-blur-md text-sm">
                 📸 Zapisz Pamiątkę
