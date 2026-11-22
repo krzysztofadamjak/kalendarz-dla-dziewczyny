@@ -40,7 +40,7 @@ export default function Admin() {
     }
   };
 
-  // Odpal pobieranie, gdy zmieni się dzień (i jesteś zalogowany)
+  // Odpall pobieranie, gdy zmieni się dzień (i jesteś zalogowany)
   useEffect(() => {
     if (isAuth) {
       loadDayData(day);
