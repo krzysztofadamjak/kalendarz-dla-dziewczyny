@@ -2,12 +2,56 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Snowfall from 'react-snowfall';
 
+// Funkcje pomocnicze do poprawnej odmiany polskich słów
+const formatYears = (y) => {
+  if (y === 1) return 'rok';
+  if ([2, 3, 4].includes(y % 10) && ![12, 13, 14].includes(y % 100)) return 'lata';
+  return 'lat';
+};
+
+const formatMonths = (m) => {
+  if (m === 1) return 'miesiąc';
+  if ([2, 3, 4].includes(m % 10) && ![12, 13, 14].includes(m % 100)) return 'miesiące';
+  return 'miesięcy';
+};
+
+const formatDays = (d) => {
+  if (d === 1) return 'dzień';
+  return 'dni';
+};
+
 export default function Home() {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
   const [countdownMessage, setCountdownMessage] = useState("Obliczanie czasu...");
   const [allUnlocked, setAllUnlocked] = useState(false);
+  
+  // Stan dla licznika związku
+  const [together, setTogether] = useState({ years: 0, months: 0, days: 0 });
 
   useEffect(() => {
+    // OBLICZANIE STAŻU ZWIĄZKU (od 10.01.2015)
+    const calculateRelationship = () => {
+      const start = new Date(2015, 0, 10); // Miesiące liczymy od 0 (0 = styczeń)
+      const now = new Date();
+      
+      let y = now.getFullYear() - start.getFullYear();
+      let m = now.getMonth() - start.getMonth();
+      let d = now.getDate() - start.getDate();
+
+      if (d < 0) {
+        m -= 1;
+        const prevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        d += prevMonth.getDate();
+      }
+      if (m < 0) {
+        y -= 1;
+        m += 12;
+      }
+      setTogether({ years: y, months: m, days: d });
+    };
+    calculateRelationship();
+
+    // ODLICZANIE DO PREZENTÓW
     const interval = setInterval(() => {
       const now = new Date();
       let targetDate = null;
@@ -48,9 +92,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-red-900 via-red-950 to-emerald-950 p-6 md:p-12 flex flex-col items-center justify-center relative overflow-hidden font-sans">
       
-      {/* Nowoczesny, płynny śnieg */}
       <Snowfall 
-        color="#fde047" // Złotawy odcień śniegu pasujący do klimatu
+        color="#fde047" 
         snowflakeCount={120} 
         radius={[0.5, 2.5]} 
         speed={[0.5, 1.5]} 
@@ -64,7 +107,7 @@ export default function Home() {
           Świąteczny Kalendarz
         </h1>
         
-        {/* Oszronione szkło (Glassmorphism) w liczniku */}
+        {/* ODLICZANIE DO KALENDARZA */}
         <div className="flex flex-col items-center mb-12 bg-white/5 backdrop-blur-xl p-6 rounded-3xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.4)] w-full max-w-lg transition-transform hover:scale-[1.02] duration-500">
           <div className="text-amber-400/80 text-xs md:text-sm mb-4 font-bold tracking-widest uppercase text-center">
             {countdownMessage}
@@ -87,7 +130,7 @@ export default function Home() {
           )}
         </div>
         
-        {/* Luksusowa siatka kalendarza */}
+        {/* SIATKA DNI */}
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 md:gap-5 w-full">
           {[...Array(24)].map((_, i) => (
             <Link 
@@ -101,8 +144,22 @@ export default function Home() {
             </Link>
           ))}
         </div>
+
+        {/* NOWOŚĆ: LICZNIK ZWIĄZKU */}
+        <div className="mt-14 mb-4 bg-black/30 backdrop-blur-xl border border-red-500/30 p-6 md:p-8 rounded-3xl shadow-[0_0_30px_rgba(220,38,38,0.15)] text-center w-full max-w-2xl transition-transform hover:scale-[1.02] duration-300">
+          <p className="text-amber-200/60 text-xs md:text-sm font-bold tracking-widest uppercase mb-4 flex items-center justify-center gap-3">
+            <span>✨</span> Nasza wspólna historia <span>✨</span>
+          </p>
+          <p className="text-lg md:text-2xl text-amber-100 font-serif leading-relaxed">
+            Jesteśmy razem już <br className="md:hidden" />
+            <span className="font-bold text-white text-3xl md:text-4xl drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] mx-2">{together.years}</span> {formatYears(together.years)}, 
+            <span className="font-bold text-white text-3xl md:text-4xl drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] ml-3 mr-2">{together.months}</span> {formatMonths(together.months)} i 
+            <span className="font-bold text-white text-3xl md:text-4xl drop-shadow-[0_0_10px_rgba(255,255,255,0.3)] ml-3 mr-2">{together.days}</span> {formatDays(together.days)} <span className="text-red-500 animate-pulse inline-block ml-1">❤️</span>
+          </p>
+        </div>
         
-        <div className="mt-16 flex flex-col md:flex-row gap-8 items-center border-t border-white/10 pt-8 w-full justify-center">
+        {/* STOPKA */}
+        <div className="mt-6 flex flex-col md:flex-row gap-8 items-center border-t border-white/10 pt-8 w-full justify-center">
           <Link to="/regulamin" className="text-amber-400/70 hover:text-amber-300 font-bold text-sm tracking-wide transition-colors flex items-center gap-2">
             <span>📜</span> Przeczytaj Regulamin
           </Link>
