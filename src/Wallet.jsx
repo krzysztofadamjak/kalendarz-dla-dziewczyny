@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import Snowfall from 'react-snowfall';
 
 export default function Wallet() {
+  const location = useLocation();
+  // Pobieramy informację ze ścieżki - domyślnie (np. po odświeżeniu) zakładamy bezpiecznie PROD (false)
+  const isTestMode = location.state?.isTest || false;
+
   const [vouchers, setVouchers] = useState([]);
   const [now, setNow] = useState(new Date().getTime());
 
-  // Aktualizacja czasu co sekundę dla liczników
+  // Aktualizacja czasu co sekundę
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date().getTime()), 1000);
     return () => clearInterval(timer);
@@ -14,32 +18,20 @@ export default function Wallet() {
 
   useEffect(() => {
     const loadedVouchers = [];
+    // Zależnie od trybu, szukamy tylko konkretnego przedrostka!
+    const prefix = isTestMode ? 'test_voucher_day_' : 'voucher_day_';
 
-    // Przeglądamy 24 dni
     for (let i = 1; i <= 24; i++) {
-      let isTest = false;
-      let voucherText = localStorage.getItem(`voucher_day_${i}`);
-      
-      // Jeśli nie ma prawdziwego kuponu, szukamy testowego
-      if (!voucherText) {
-        voucherText = localStorage.getItem(`test_voucher_day_${i}`);
-        if (voucherText) isTest = true;
-      }
+      const voucherText = localStorage.getItem(`${prefix}${i}`);
       
       if (voucherText) {
-        const prefix = isTest ? 'test_voucher_day_' : 'voucher_day_';
-        
-        // Sprawdzamy czas odkrycia
         let timeScratched = localStorage.getItem(`time_scratched_${prefix}${i}`);
         if (!timeScratched) {
           timeScratched = new Date().getTime().toString();
           localStorage.setItem(`time_scratched_${prefix}${i}`, timeScratched);
         }
 
-        // 48 godzin ważności
         const expirationTime = parseInt(timeScratched, 10) + (48 * 60 * 60 * 1000);
-        
-        // Czy zrealizowany?
         const isCompleted = localStorage.getItem(`completed_${prefix}${i}`) === 'true';
 
         loadedVouchers.push({
@@ -47,15 +39,14 @@ export default function Wallet() {
           text: voucherText,
           expirationTime,
           isCompleted,
-          isTest // Dodajemy info, czy to kupon testowy
+          isTest: isTestMode
         });
       }
     }
     
-    // Sortujemy
     loadedVouchers.sort((a, b) => a.expirationTime - b.expirationTime);
     setVouchers(loadedVouchers);
-  }, []);
+  }, [isTestMode]);
 
   const getRemainingTime = (expTime) => {
     const diff = expTime - now;
@@ -71,6 +62,9 @@ export default function Wallet() {
       <Snowfall color="#ffffff" snowflakeCount={40} style={{ opacity: 0.3, zIndex: 0 }} />
 
       <div className="z-10 w-full max-w-2xl flex flex-col items-center">
+        
+        {isTestMode && <div className="bg-red-500 text-white font-bold py-1 px-8 rounded-full mb-4 animate-pulse">WIDOK TESTOWY PORTFELA</div>}
+
         <h1 className="text-4xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-b from-amber-200 to-amber-500 font-extrabold mb-2 font-serif text-center mt-6">
           Twój Portfel Kuponów
         </h1>
@@ -140,8 +134,9 @@ export default function Wallet() {
           </div>
         )}
 
-        <Link to="/test" className="mt-12 bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-8 rounded-full border border-white/20 transition-all backdrop-blur-md shadow-lg">
-          Wróć do Kalendarza
+        {/* DYNAMICZNY POWRÓT ZALEŻNIE OD TEGO SKĄD PRZYSZLIŚMY */}
+        <Link to={isTestMode ? "/test" : "/"} className="mt-12 bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-8 rounded-full border border-white/20 transition-all backdrop-blur-md shadow-lg">
+          {isTestMode ? "Wróć do Testów" : "Wróć do Kalendarza"}
         </Link>
       </div>
     </div>

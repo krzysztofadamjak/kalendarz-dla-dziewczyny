@@ -145,7 +145,7 @@ export default function Home() {
           ))}
         </div>
 
-        {/* NOWOŚĆ: LICZNIK ZWIĄZKU */}
+        {/* LICZNIK ZWIĄZKU */}
         <div className="mt-14 mb-4 bg-black/30 backdrop-blur-xl border border-red-500/30 p-6 md:p-8 rounded-3xl shadow-[0_0_30px_rgba(220,38,38,0.15)] text-center w-full max-w-2xl transition-transform hover:scale-[1.02] duration-300">
           <p className="text-amber-200/60 text-xs md:text-sm font-bold tracking-widest uppercase mb-4 flex items-center justify-center gap-3">
             <span>✨</span> Nasza wspólna historia <span>✨</span>
@@ -158,9 +158,13 @@ export default function Home() {
           </p>
         </div>
         
-        {/* NOWY PRZYCISK PORTFELA KUPONÓW */}
+        {/* PRZYCISK PORTFELA KUPONÓW (Z POPRAWIONYM STATE) */}
         <div className="mt-6 flex justify-center w-full">
-          <Link to="/portfel" className="group bg-gradient-to-r from-emerald-600/30 to-emerald-800/30 hover:from-emerald-500/40 hover:to-emerald-700/40 border border-emerald-500/50 text-emerald-300 px-8 py-4 rounded-full font-bold text-lg tracking-wide transition-all transform hover:scale-105 flex items-center gap-4 shadow-[0_0_20px_rgba(16,185,129,0.2)] backdrop-blur-md">
+          <Link 
+            to="/portfel" 
+            state={{ isTest: false }} 
+            className="group bg-gradient-to-r from-emerald-600/30 to-emerald-800/30 hover:from-emerald-500/40 hover:to-emerald-700/40 border border-emerald-500/50 text-emerald-300 px-8 py-4 rounded-full font-bold text-lg tracking-wide transition-all transform hover:scale-105 flex items-center gap-4 shadow-[0_0_20px_rgba(16,185,129,0.2)] backdrop-blur-md"
+          >
             <span className="text-2xl group-hover:scale-110 transition-transform">🪪</span> 
             Otwórz Portfel Kuponów
           </Link>
