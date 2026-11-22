@@ -158,16 +158,16 @@ export default function Home() {
           </p>
         </div>
         
-		{/* NOWY PRZYCISK PORTFELA */}
-        <div className="mt-10 flex justify-center w-full">
-        <Link to="/portfel" className="group bg-gradient-to-r from-emerald-600/30 to-emerald-800/30 hover:from-emerald-500/40 hover:to-emerald-700/40 border border-emerald-500/50 text-emerald-300 px-8 py-4 rounded-full font-bold text-lg tracking-wide transition-all transform hover:scale-105 flex items-center gap-4 shadow-[0_0_20px_rgba(16,185,129,0.2)] backdrop-blur-md">
-         <span className="text-2xl group-hover:scale-110 transition-transform">🪪</span> 
-           Otwórz Portfel Kuponów
-           </Link>
-           </div>
+        {/* NOWY PRZYCISK PORTFELA KUPONÓW */}
+        <div className="mt-6 flex justify-center w-full">
+          <Link to="/portfel" className="group bg-gradient-to-r from-emerald-600/30 to-emerald-800/30 hover:from-emerald-500/40 hover:to-emerald-700/40 border border-emerald-500/50 text-emerald-300 px-8 py-4 rounded-full font-bold text-lg tracking-wide transition-all transform hover:scale-105 flex items-center gap-4 shadow-[0_0_20px_rgba(16,185,129,0.2)] backdrop-blur-md">
+            <span className="text-2xl group-hover:scale-110 transition-transform">🪪</span> 
+            Otwórz Portfel Kuponów
+          </Link>
+        </div>
 
         {/* STOPKA */}
-        <div className="mt-6 flex flex-col md:flex-row gap-8 items-center border-t border-white/10 pt-8 w-full justify-center">
+        <div className="mt-8 flex flex-col md:flex-row gap-8 items-center border-t border-white/10 pt-8 w-full justify-center">
           <Link to="/regulamin" className="text-amber-400/70 hover:text-amber-300 font-bold text-sm tracking-wide transition-colors flex items-center gap-2">
             <span>📜</span> Przeczytaj Regulamin
           </Link>
