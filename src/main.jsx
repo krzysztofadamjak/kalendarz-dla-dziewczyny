@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import App from './App.jsx'
-import Admin from './Admin.jsx' // Importujemy nowy komponent
+import Admin from './admin.jsx' // Importujemy nowy komponent
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
