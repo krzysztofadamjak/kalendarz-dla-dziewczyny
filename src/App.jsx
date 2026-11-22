@@ -15,18 +15,14 @@ export default function App() {
   const [hasDrawn, setHasDrawn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Referencja do obszaru, z którego zrobimy obrazek
   const captureRef = useRef(null);
-
   const today = new Date();
   let realMonth = today.getMonth(); 
   let realDate = today.getDate();
 
-  // Wyłączamy blokadę, jeśli adres zaczyna się od /test
   const isLocked = !isTestMode && (realMonth < 11 || (realMonth === 11 && realDate < currentDay));
 
   useEffect(() => {
-    // Osobna pamięć dla testów, żeby nie zepsuć prawdziwych losowań
     const storageKey = isTestMode ? `test_voucher_day_${currentDay}` : `voucher_day_${currentDay}`;
     const saved = localStorage.getItem(storageKey);
     if (saved) {
@@ -44,7 +40,7 @@ export default function App() {
       const docRef = doc(db, "vouchers", currentDay.toString());
       const docSnap = await getDoc(docRef);
 
-      let todayOptions = ["Brak bonu. Mikołaj zapomniał dodać go do bazy!"];
+      let todayOptions = ["Brak bonu. Mikołaj zapomniał dodać go do bazy! 🎅"];
       if (docSnap.exists() && docSnap.data().options?.length > 0) {
         todayOptions = docSnap.data().options;
       }
@@ -57,7 +53,6 @@ export default function App() {
       
       const storageKey = isTestMode ? `test_voucher_day_${currentDay}` : `voucher_day_${currentDay}`;
       localStorage.setItem(storageKey, selectedVoucher);
-      
     } catch (error) {
       console.error("Błąd bazy:", error);
       alert("Błąd połączenia z bazą danych.");
@@ -69,59 +64,54 @@ export default function App() {
   const shareAsImage = async () => {
     if (!captureRef.current) return;
     try {
-      // Robimy zrzut elementu z bonem
       const canvas = await html2canvas(captureRef.current, {
-        backgroundColor: '#0f172a', // Kolor tła dopasowany do aplikacji
-        scale: 2 // Lepsza jakość obrazka
+        backgroundColor: '#450a0a', // Świąteczna głęboka czerwień pod obrazkiem
+        scale: 2 
       });
       
       canvas.toBlob(async (blob) => {
-        const file = new File([blob], `bon-dzien-${currentDay}.png`, { type: 'image/png' });
-        
-        // Sprawdzamy, czy urządzenie (np. smartfon) obsługuje bezpośrednie udostępnianie plików
+        const file = new File([blob], `swiateczny-bon-${currentDay}.png`, { type: 'image/png' });
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({
-              title: `Mój bon na dzień ${currentDay}!`,
+              title: `Mój bon na ${currentDay} grudnia! 🎄`,
               files: [file]
             });
           } catch (e) {
             console.log("Anulowano udostępnianie.");
           }
         } else {
-          // Awaryjnie (np. na PC) pobieramy obrazek na dysk
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          a.download = `bon-dzien-${currentDay}.png`;
+          a.download = `swiateczny-bon-${currentDay}.png`;
           a.click();
           URL.revokeObjectURL(url);
         }
       });
     } catch (error) {
-      console.error("Błąd generowania grafiki", error);
-      alert("Nie udało się wygenerować obrazka.");
+      console.error("Błąd generowania", error);
     }
   };
 
   if (isNaN(currentDay) || currentDay < 1 || currentDay > 24) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="text-white text-center text-2xl font-bold">Nieprawidłowy dzień!</div>
+      <div className="min-h-screen bg-gradient-to-br from-red-900 to-emerald-950 flex items-center justify-center p-4">
+        <div className="text-amber-400 text-center text-2xl font-bold font-serif">Nieprawidłowy dzień! 🎁</div>
       </div>
     );
   }
 
   if (isLocked) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="bg-slate-800 p-8 rounded-2xl shadow-xl text-center max-w-md w-full border border-slate-700">
-          <h2 className="text-4xl mb-4">🛑</h2>
-          <h2 className="text-2xl font-bold text-red-500 mb-4">To jeszcze nie ten dzień!</h2>
-          <p className="text-slate-300 text-lg mb-8">
-            Ten bon będzie dostępny dopiero <strong>{currentDay} grudnia</strong>.
+      <div className="min-h-screen bg-gradient-to-br from-red-900 via-red-950 to-emerald-950 flex items-center justify-center p-4">
+        <div className="bg-red-950/80 backdrop-blur-sm p-8 rounded-3xl shadow-[0_0_30px_rgba(0,0,0,0.5)] text-center max-w-md w-full border-2 border-red-800">
+          <h2 className="text-6xl mb-4 animate-bounce">🎁</h2>
+          <h2 className="text-3xl font-bold text-amber-400 mb-4 font-serif">Jeszcze nie czas!</h2>
+          <p className="text-red-200 text-lg mb-8 italic">
+            Ten prezent otworzy się dopiero <strong>{currentDay} grudnia</strong>. Mikołaj wszystko widzi! 🎅
           </p>
-          <Link to="/" className="bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 px-8 rounded-full transition-colors">
+          <Link to="/" className="inline-block bg-gradient-to-r from-emerald-700 to-emerald-900 hover:from-emerald-600 hover:to-emerald-800 text-amber-300 font-bold py-3 px-8 rounded-full shadow-lg border border-emerald-500 transition-transform hover:scale-105">
             Wróć do kalendarza
           </Link>
         </div>
@@ -130,34 +120,54 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4" ref={captureRef}>
-      {isTestMode && <div className="text-red-500 font-bold mb-4 animate-pulse">TRYB TESTOWY</div>}
-      <h1 className="text-4xl text-white font-bold mb-8">Grudzień {currentDay}</h1>
-      
-      {!hasDrawn ? (
-        <button 
-          onClick={drawVoucher}
-          disabled={isLoading}
-          className="bg-red-600 hover:bg-red-500 text-white font-bold py-4 px-8 rounded-full shadow-lg transition-transform transform hover:scale-105 disabled:opacity-50"
-        >
-          {isLoading ? "Losowanie..." : "Odkryj dzisiejszy prezent"}
-        </button>
-      ) : (
-        <div className="flex flex-col items-center w-full">
-          <div className="bg-white text-slate-900 p-8 rounded-2xl shadow-2xl text-center max-w-md w-full animate-fade-in mb-6">
-            <h2 className="text-2xl font-bold mb-4 text-red-600">Twój bon na dziś:</h2>
-            <p className="text-xl italic font-medium">"{voucher}"</p>
+    <div className="min-h-screen bg-gradient-to-br from-red-900 via-red-950 to-emerald-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+      {/* Poświata przyciągająca wzrok do streafy screena */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_rgba(251,191,36,0.15)_0%,_transparent_60%)] pointer-events-none"></div>
+
+      <div ref={captureRef} className="flex flex-col items-center w-full z-10 py-8 px-4 rounded-3xl">
+        {isTestMode && <div className="text-red-400 font-bold mb-2 text-sm">TRYB TESTOWY</div>}
+        
+        <h1 className="text-5xl md:text-6xl text-amber-400 font-extrabold mb-8 drop-shadow-[0_0_15px_rgba(251,191,36,0.6)] font-serif">
+          Grudzień {currentDay}
+        </h1>
+        
+        {!hasDrawn ? (
+          <button 
+            onClick={drawVoucher}
+            disabled={isLoading}
+            className="bg-gradient-to-br from-emerald-600 to-emerald-800 hover:from-emerald-500 hover:to-emerald-700 text-amber-300 font-bold py-5 px-10 rounded-full shadow-[0_0_20px_rgba(4,120,87,0.6)] transition-all transform hover:scale-105 disabled:opacity-50 border-2 border-emerald-400 font-serif text-xl"
+          >
+            {isLoading ? "Rozwiązywanie wstążki..." : "Odkryj dzisiejszy prezent 🎀"}
+          </button>
+        ) : (
+          <div className="flex flex-col items-center w-full">
+            {/* Ciepła karta bonu w stylu świątecznym */}
+            <div className="bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] bg-amber-50 text-red-950 p-10 rounded-xl shadow-[0_0_40px_rgba(251,191,36,0.3)] text-center max-w-md w-full animate-fade-in mb-8 border-4 border-double border-red-900 relative">
+              <div className="absolute top-2 left-2 text-2xl opacity-30">🎄</div>
+              <div className="absolute bottom-2 right-2 text-2xl opacity-30">🦌</div>
+              
+              <h2 className="text-2xl font-bold mb-6 text-emerald-800 font-serif uppercase tracking-widest border-b-2 border-emerald-800/20 pb-4">
+                Twój świąteczny bon
+              </h2>
+              <p className="text-2xl italic font-medium font-serif leading-relaxed text-red-950">
+                "{voucher}"
+              </p>
+            </div>
           </div>
-          
+        )}
+      </div>
+      
+      {hasDrawn && (
+        <div className="flex flex-col items-center gap-4 z-10 mt-4">
           <button 
             onClick={shareAsImage}
-            className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-colors flex items-center gap-2 mb-4"
+            className="bg-red-800/50 hover:bg-red-700 text-amber-100 font-bold py-3 px-8 rounded-full shadow-lg transition-colors flex items-center gap-2 border border-red-600 backdrop-blur-sm"
           >
-            📸 Prześlij jako obrazek
+            📸 Zapisz / Wyślij obrazek
           </button>
           
-          <Link to={isTestMode ? "/test" : "/"} className="text-sm text-slate-500 hover:text-slate-300 font-bold underline">
-            Wróć do siatki
+          <Link to={isTestMode ? "/test" : "/"} className="text-sm text-red-300 hover:text-amber-300 transition-colors font-bold underline mb-8">
+            Wróć do kalendarza
           </Link>
         </div>
       )}
