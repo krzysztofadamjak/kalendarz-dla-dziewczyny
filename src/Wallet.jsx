@@ -14,46 +14,49 @@ export default function Wallet() {
 
   useEffect(() => {
     const loadedVouchers = [];
-    const isTestMode = location.pathname.startsWith('/test');
-    const prefix = isTestMode ? 'test_voucher_day_' : 'voucher_day_';
 
     // Przeglądamy 24 dni
     for (let i = 1; i <= 24; i++) {
-      const voucherText = localStorage.getItem(`${prefix}${i}`);
+      let isTest = false;
+      let voucherText = localStorage.getItem(`voucher_day_${i}`);
+      
+      // Jeśli nie ma prawdziwego kuponu, szukamy testowego
+      if (!voucherText) {
+        voucherText = localStorage.getItem(`test_voucher_day_${i}`);
+        if (voucherText) isTest = true;
+      }
       
       if (voucherText) {
-        // Sprawdzamy, czy kupon dostał czas "odkrycia"
-        let timeScratched = localStorage.getItem(`time_scratched_${prefix}${i}`);
+        const prefix = isTest ? 'test_voucher_day_' : 'voucher_day_';
         
-        // Jeśli nie ma czasu, a jest odkryty (kompatybilność wsteczna z poprzednimi testami), ustawiamy na teraz
+        // Sprawdzamy czas odkrycia
+        let timeScratched = localStorage.getItem(`time_scratched_${prefix}${i}`);
         if (!timeScratched) {
           timeScratched = new Date().getTime().toString();
           localStorage.setItem(`time_scratched_${prefix}${i}`, timeScratched);
         }
 
-        // Dajemy każdemu kuponowi dokładnie 48 godzin (172800000 milisekund) na realizację
+        // 48 godzin ważności
         const expirationTime = parseInt(timeScratched, 10) + (48 * 60 * 60 * 1000);
         
-        // Czy został zrealizowany? (Stan z Firebase lub localStorage - uprośćmy na razie do localStorage)
-        // Uwaga: W idealnym scenariuszu pobieralibyśmy isCompleted z Firestore. 
-        // Dla prostoty i szybkości sprawdzamy flagę lokalną:
+        // Czy zrealizowany?
         const isCompleted = localStorage.getItem(`completed_${prefix}${i}`) === 'true';
 
         loadedVouchers.push({
           day: i,
           text: voucherText,
           expirationTime,
-          isCompleted
+          isCompleted,
+          isTest // Dodajemy info, czy to kupon testowy
         });
       }
     }
     
-    // Sortujemy: najpierw te aktywne, z najkrótszym czasem, na końcu wygasłe/zrealizowane
+    // Sortujemy
     loadedVouchers.sort((a, b) => a.expirationTime - b.expirationTime);
     setVouchers(loadedVouchers);
   }, []);
 
-  // Funkcja formatująca pozostały czas
   const getRemainingTime = (expTime) => {
     const diff = expTime - now;
     if (diff <= 0) return "Wygasł";
@@ -85,9 +88,9 @@ export default function Wallet() {
           <div className="flex flex-col gap-6 w-full px-2">
             {vouchers.map((v) => {
               const isExpired = now >= v.expirationTime;
-              const isExpiringSoon = !isExpired && (v.expirationTime - now < 12 * 60 * 60 * 1000); // Mniej niż 12h
+              const isExpiringSoon = !isExpired && (v.expirationTime - now < 12 * 60 * 60 * 1000); 
               
-              let cardStyle = "bg-gradient-to-r from-emerald-800 to-emerald-950 border-emerald-500/50 shadow-[0_8px_30px_rgba(16,185,129,0.2)]"; // Aktywny
+              let cardStyle = "bg-gradient-to-r from-emerald-800 to-emerald-950 border-emerald-500/50 shadow-[0_8px_30px_rgba(16,185,129,0.2)]";
               let statusText = `Ważny jeszcze: ${getRemainingTime(v.expirationTime)}`;
               let statusColor = "text-emerald-300";
 
@@ -106,12 +109,12 @@ export default function Wallet() {
 
               return (
                 <div key={v.day} className={`relative p-6 rounded-3xl border-2 backdrop-blur-md transition-all transform hover:scale-[1.02] flex flex-col justify-between overflow-hidden ${cardStyle}`}>
-                  {/* Subtelny "pasek magnetyczny" dla efektu karty */}
                   <div className="absolute top-0 right-0 w-20 h-full bg-white/5 transform skew-x-12"></div>
                   
                   <div className="flex justify-between items-start mb-4 z-10">
                     <h3 className="text-amber-400 font-bold uppercase tracking-widest text-xs">
-                      {isTestMode ? "TEST " : ""}Kupon z dnia {v.day}
+                      {v.isTest ? <span className="text-red-500 font-extrabold mr-1">[TEST]</span> : ""}
+                      Kupon z dnia {v.day}
                     </h3>
                     <span className="text-2xl opacity-50">🎫</span>
                   </div>
@@ -126,7 +129,7 @@ export default function Wallet() {
                     </span>
                     
                     {!v.isCompleted && !isExpired && (
-                      <Link to={isTestMode ? `/test/${v.day}` : `/dzien/${v.day}`} className="bg-white/10 hover:bg-white/20 text-white text-xs font-bold py-2 px-4 rounded-full transition-colors border border-white/20">
+                      <Link to={v.isTest ? `/test/${v.day}` : `/dzien/${v.day}`} className="bg-white/10 hover:bg-white/20 text-white text-xs font-bold py-2 px-4 rounded-full transition-colors border border-white/20">
                         Przejdź do realizacji
                       </Link>
                     )}
@@ -137,7 +140,7 @@ export default function Wallet() {
           </div>
         )}
 
-        <Link to="/" className="mt-12 bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-8 rounded-full border border-white/20 transition-all backdrop-blur-md shadow-lg">
+        <Link to="/test" className="mt-12 bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-8 rounded-full border border-white/20 transition-all backdrop-blur-md shadow-lg">
           Wróć do Kalendarza
         </Link>
       </div>
