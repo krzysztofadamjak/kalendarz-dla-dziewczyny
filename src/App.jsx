@@ -8,7 +8,6 @@ import { useWindowSize } from 'react-use';
 import ScratchCard from 'react-scratchcard-v2'; 
 import Snowfall from 'react-snowfall';
 
-// WŁASNY HOOK: Maszyna do pisania
 const useTypewriter = (text, speed = 40, startTyping = false) => {
   const [displayedText, setDisplayedText] = useState('');
   
@@ -53,12 +52,9 @@ export default function App() {
   const [reaction, setReaction] = useState(null);
   const [isCompleted, setIsCompleted] = useState(false);
   
-  // ZAGADKA I GRINCH
   const [trivia, setTrivia] = useState(null);
   const [triviaError, setTriviaError] = useState(false);
   const [startTyping, setStartTyping] = useState(false);
-  
-  // STAN KARY (COOLDOWN)
   const [grinchTimeLeft, setGrinchTimeLeft] = useState(0);
   
   const [hasDrawn, setHasDrawn] = useState(false);
@@ -67,6 +63,12 @@ export default function App() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [generatedImage, setGeneratedImage] = useState(null);
   
+  // --- STANY SKANERA WIARYGODNOŚCI ---
+  const [showScanner, setShowScanner] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
+  const [scanLogs, setScanLogs] = useState([]);
+
   const captureRef = useRef(null);
   const today = new Date();
   let realMonth = today.getMonth(); 
@@ -81,11 +83,8 @@ export default function App() {
     if (penaltyEndTime) {
       const now = new Date().getTime();
       const diff = parseInt(penaltyEndTime, 10) - now;
-      if (diff > 0) {
-        setGrinchTimeLeft(Math.ceil(diff / 1000));
-      } else {
-        localStorage.removeItem(`grinch_penalty_day_${currentDay}`);
-      }
+      if (diff > 0) setGrinchTimeLeft(Math.ceil(diff / 1000));
+      else localStorage.removeItem(`grinch_penalty_day_${currentDay}`);
     }
   }, [currentDay]);
 
@@ -154,7 +153,6 @@ export default function App() {
     fetchVoucherData();
   }, [currentDay, isTestMode]);
 
-  // --- DŹWIĘKI I MIKOŁAJ ---
   const playMagicSound = () => {
     const audio = new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_24e20f1883.mp3');
     audio.volume = 0.5;
@@ -167,38 +165,73 @@ export default function App() {
     audio.play().catch(() => {});
   };
 
-  // NOWOŚĆ: GADAJĄCY MIKOŁAJ (Web Speech API)
   const playSantaVoice = (textToRead) => {
     if ('speechSynthesis' in window) {
-      // Zatrzymujemy poprzednie kwestie, jeśli klika za szybko
       window.speechSynthesis.cancel();
-      
       const santaMessage = `Ho ho ho! Odkryłaś swój prezent! ${textToRead}`;
       const utterance = new SpeechSynthesisUtterance(santaMessage);
-      
-      utterance.lang = 'pl-PL'; // Polski głos
-      utterance.pitch = 0.8;    // Niższy, grubszy głos (Mikołaj)
-      utterance.rate = 0.9;     // Troszkę wolniejsze, dostojne tempo
-      
+      utterance.lang = 'pl-PL'; 
+      utterance.pitch = 0.8;    
+      utterance.rate = 0.9;     
       window.speechSynthesis.speak(utterance);
     }
+  };
+
+  // --- LOGIKA SKANERA ---
+  const handleStartScan = () => {
+    setIsScanning(true);
+    setScanProgress(0);
+    setScanLogs(["[INIT] Nawiązywanie szyfrowanego połączenia z Biegunem Północnym..."]);
+
+    // Dźwięk hakowania/komputera
+    const scanAudio = new Audio('https://cdn.pixabay.com/audio/2022/03/24/audio_3db61a7a14.mp3');
+    scanAudio.volume = 0.3;
+    scanAudio.play().catch(()=>{});
+
+    let progress = 0;
+    const logsSequence = [
+      { p: 15, msg: "[AUTH] ODCISK PALCA ZWERYFIKOWANY." },
+      { p: 30, msg: "[DB] Pobieranie historii zachowania z roku 2026..." },
+      { p: 45, msg: "[ANALYSIS] Skanowanie poziomu cierpliwości... Zadowalający." },
+      { p: 60, msg: "[ANALYSIS] Weryfikacja ilości uśmiechów... Przekroczono normę." },
+      { p: 75, msg: "[WARN] Wykryto drobne marudzenie. Ignorowanie błędu..." },
+      { p: 90, msg: "[CALC] Obliczanie ostatecznego wskaźnika grzeczności..." },
+      { p: 100, msg: "[SUCCESS] Wskaźnik: 98%. DOSTĘP PRZYZNANY!" }
+    ];
+
+    const interval = setInterval(() => {
+      progress += 2;
+      setScanProgress(progress);
+      
+      const log = logsSequence.find(l => l.p === progress);
+      if (log) {
+        setScanLogs(prev => [...prev, log.msg]);
+      }
+
+      if (progress >= 100) {
+        clearInterval(interval);
+        setTimeout(() => {
+          setIsScanning(false);
+          setShowScanner(false); // Chowamy skaner
+          drawVoucher();         // I dopiero teraz losujemy bon!
+        }, 1800); 
+      }
+    }, 80); // Szybkość "hakowania"
   };
 
   const handleTriviaAnswer = (selected) => {
     if (grinchTimeLeft > 0) return; 
 
     if (selected === trivia.correct) {
-      drawVoucher();
+      // ZAMIAST OD RAZU LOSOWAĆ, ODPALAMY SKANER
+      setShowScanner(true);
     } else {
       playGrinchSound();
       setTriviaError(true);
-      
       const penaltyDurationSeconds = 60; 
       setGrinchTimeLeft(penaltyDurationSeconds);
-      
       const endTime = new Date().getTime() + (penaltyDurationSeconds * 1000);
       localStorage.setItem(`grinch_penalty_day_${currentDay}`, endTime.toString());
-      
       setTimeout(() => setTriviaError(false), 3000); 
     }
   };
@@ -230,7 +263,6 @@ export default function App() {
     playMagicSound();
     setShowConfetti(true);
     
-    // URUCHOMIENIE MIKOŁAJA!
     playSantaVoice(voucher);
     
     const now = new Date().getTime();
@@ -245,12 +277,9 @@ export default function App() {
             timeScratched: now,
             drawnVoucher: voucher
           });
-        } catch (e) {
-          console.log("Nie udało się zapisać do chmury", e);
-        }
+        } catch (e) {}
       }
     }
-
     setTimeout(() => setShowConfetti(false), 5000);
   };
 
@@ -275,7 +304,6 @@ export default function App() {
       const docRef = doc(db, "vouchers", currentDay.toString());
       await updateDoc(docRef, { isCompleted: true });
       setIsCompleted(true);
-      
       localStorage.setItem(`completed_voucher_day_${currentDay}`, 'true');
       playMagicSound();
     } catch (e) {}
@@ -332,18 +360,51 @@ export default function App() {
           </h1>
           
           {!hasDrawn ? (
-            trivia ? (
+            // JEŚLI MAMY POKAZAĆ SKANER HAKERSKI:
+            showScanner ? (
+              <div className="bg-black/95 border-2 border-emerald-500 p-8 rounded-2xl w-full max-w-md font-mono text-emerald-400 shadow-[0_0_40px_rgba(16,185,129,0.3)] animate-fade-in text-left">
+                <h3 className="text-center text-lg mb-6 text-emerald-500 font-bold border-b border-emerald-500/30 pb-3 flex items-center justify-center gap-2">
+                  <span>🕵️</span> TERMINAL BIEGUNA PÓŁNOCNEGO
+                </h3>
+                
+                {!isScanning && scanProgress === 0 ? (
+                  <div className="flex flex-col items-center py-8">
+                    <p className="text-sm mb-8 text-slate-300 text-center uppercase tracking-widest">Wymagana autoryzacja biometryczna</p>
+                    <button 
+                      onClick={handleStartScan}
+                      className="text-7xl animate-pulse hover:scale-110 transition-transform filter drop-shadow-[0_0_20px_rgba(52,211,153,0.8)]"
+                    >
+                      👆
+                    </button>
+                    <p className="text-xs mt-8 text-emerald-600 uppercase tracking-widest">Dotknij, by zeskanować</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col gap-2 h-48 overflow-y-auto mb-6 text-xs md:text-sm custom-scrollbar pr-2">
+                      {scanLogs.map((log, i) => (
+                        <div key={i} className={`animate-fade-in ${log.includes('[WARN]') ? 'text-amber-400' : log.includes('[SUCCESS]') ? 'text-white font-bold bg-emerald-700/40 p-1 rounded' : 'text-emerald-400'}`}>
+                          {log}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {(isScanning || scanProgress > 0) && (
+                      <div className="w-full bg-emerald-950/50 rounded-full h-3 border border-emerald-500/30 overflow-hidden">
+                        <div className="bg-emerald-500 h-full transition-all duration-75 shadow-[0_0_10px_rgba(16,185,129,0.8)]" style={{ width: `${scanProgress}%` }}></div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : trivia ? (
+              // STANDARDOWY WIDOK ZAGADKI
               <div className={`backdrop-blur-xl border p-8 rounded-3xl max-w-md w-full text-center shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative overflow-hidden transition-colors duration-1000 ${isGrinchMode ? 'bg-black/80 border-slate-700' : 'bg-black/40 border-white/10'}`}>
                 
                 {isGrinchMode ? (
                   <div className="flex flex-col items-center justify-center py-6 animate-fade-in">
                     <span className="text-7xl mb-6 drop-shadow-[0_0_20px_rgba(34,197,94,0.6)]">🧌</span>
-                    <h2 className="text-emerald-500 font-bold uppercase tracking-widest text-lg mb-2">
-                      Tryb Grincha!
-                    </h2>
-                    <p className="text-slate-300 font-serif italic mb-8">
-                      Mikołaj widzi, że nie uważałaś! <br/>Za karę musisz odczekać.
-                    </p>
+                    <h2 className="text-emerald-500 font-bold uppercase tracking-widest text-lg mb-2">Tryb Grincha!</h2>
+                    <p className="text-slate-300 font-serif italic mb-8">Mikołaj widzi, że nie uważałaś! <br/>Za karę musisz odczekać.</p>
                     <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full">
                       <p className="text-slate-400 text-xs uppercase tracking-widest mb-2">Blokada systemu</p>
                       <p className="text-5xl font-mono text-emerald-500 animate-pulse font-bold">{grinchTimeLeft}s</p>
@@ -352,14 +413,9 @@ export default function App() {
                 ) : (
                   <>
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-400 to-transparent opacity-50"></div>
-                    <h2 className="text-amber-400/80 font-bold uppercase tracking-widest text-xs mb-6 flex items-center justify-center gap-2">
-                      <span>🕵️</span> Mikołaj pyta
-                    </h2>
+                    <h2 className="text-amber-400/80 font-bold uppercase tracking-widest text-xs mb-6 flex items-center justify-center gap-2"><span>🕵️</span> Mikołaj pyta</h2>
                     <div className="min-h-[80px] flex items-center justify-center mb-8">
-                      <p className="text-xl text-white font-serif italic leading-relaxed">
-                        "{typedQuestion}"
-                        <span className="animate-pulse ml-1 text-amber-400">|</span>
-                      </p>
+                      <p className="text-xl text-white font-serif italic leading-relaxed">"{typedQuestion}"<span className="animate-pulse ml-1 text-amber-400">|</span></p>
                     </div>
                     
                     <div className="flex flex-col gap-3">
@@ -373,18 +429,14 @@ export default function App() {
                         <span className="bg-white/10 px-3 py-1 rounded-lg mr-4 font-bold text-amber-400">C</span>{trivia.C}
                       </button>
                     </div>
-
-                    {triviaError && (
-                      <p className="text-red-400 font-bold mt-6 animate-pulse bg-red-900/30 py-2 rounded-lg border border-red-500/30">
-                        ❌ Błędna odpowiedź! Uruchamiam procedurę kary...
-                      </p>
-                    )}
+                    {triviaError && <p className="text-red-400 font-bold mt-6 animate-pulse bg-red-900/30 py-2 rounded-lg border border-red-500/30">❌ Błędna odpowiedź! Uruchamiam procedurę kary...</p>}
                   </>
                 )}
               </div>
             ) : (
-              <button onClick={drawVoucher} disabled={isLoading} className="bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 text-white font-bold py-5 px-12 rounded-full shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all transform hover:scale-105 hover:-translate-y-1 font-serif text-xl border border-emerald-400/50 flex items-center gap-3">
-                {isLoading ? "Rozwiązywanie wstążki..." : <>Odkryj prezent <span className="text-2xl">🎀</span></>}
+              // BRAK ZAGADKI - ODPALAMY SKANER BEZPOŚREDNIO
+              <button onClick={() => setShowScanner(true)} disabled={isLoading} className="bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-400 hover:to-emerald-600 text-white font-bold py-5 px-12 rounded-full shadow-[0_10px_40px_rgba(16,185,129,0.5)] transition-all transform hover:scale-105 font-serif text-xl border border-emerald-400/50 flex items-center gap-3">
+                Rozpocznij autoryzację <span className="text-2xl">🔐</span>
               </button>
             )
           ) : (
