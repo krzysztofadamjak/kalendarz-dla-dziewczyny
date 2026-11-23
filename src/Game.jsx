@@ -6,35 +6,35 @@ import Snowfall from 'react-snowfall';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
 
-const RESET_FLAG_KEY = 'factory_hard_reset_v2_2026';
+const RESET_FLAG_KEY = 'factory_hard_reset_v3_2026';
 
 const UPGRADES = {
-  elf: { id: 'elf', name: 'Scenic', baseCost: 35, cps: 1, icon: '🚐', desc: 'Produkuje 1 Magię/sek.' },
-  reindeer: { id: 'reindeer', name: 'Meganka', baseCost: 450, cps: 12, icon: '🚗', desc: 'Produkuje 12 Magii/sek.' },
-  maverick: { id: 'maverick', name: 'Maverick w LPG', baseCost: 3500, cps: 75, icon: '🛻', desc: 'Produkuje 75 Magii/sek.' },
-  lexus: { id: 'lexus', name: 'Lexus Hybryda', baseCost: 24000, cps: 360, icon: '🏎️', desc: 'Produkuje 360 Magii/sek.' }
+  elf: { id: 'elf', name: 'Scenic', baseCost: 60, cps: 1, upkeepPerMin: 1, icon: '🚐', desc: '+1 Magia/s • Utrzymanie: 1/min' },
+  reindeer: { id: 'reindeer', name: 'Meganka', baseCost: 900, cps: 10, upkeepPerMin: 14, icon: '🚗', desc: '+10 Magii/s • Utrzymanie: 14/min' },
+  maverick: { id: 'maverick', name: 'Maverick w LPG', baseCost: 7500, cps: 60, upkeepPerMin: 95, icon: '🛻', desc: '+60 Magii/s • Utrzymanie: 95/min' },
+  lexus: { id: 'lexus', name: 'Lexus Hybryda', baseCost: 55000, cps: 280, upkeepPerMin: 480, icon: '🏎️', desc: '+280 Magii/s • Utrzymanie: 480/min' }
 };
 
-const GLOVES_BASE_COST = 250;
-const CASINO_COST = 1800;
-const CASINO_COOLDOWN_MS = 2 * 60 * 60 * 1000;
-const PRESTIGE_THRESHOLD = 75000;
+const GLOVES_BASE_COST = 500;
+const CASINO_COST = 3500;
+const CASINO_COOLDOWN_MS = 3 * 60 * 60 * 1000;
+const PRESTIGE_THRESHOLD = 180000;
 
 const QUEST_TEMPLATES = [
-  { id: 'taps_200', title: 'Rozgrzewka na mrozie', target: 200, reward: 650, field: 'sessionTaps' },
-  { id: 'buys_3', title: 'Rozbudowa warsztatu', target: 3, reward: 1200, field: 'sessionBuys' },
-  { id: 'spins_1', title: 'Wizyta u Elfa', target: 1, reward: 1500, field: 'sessionSpins' },
-  { id: 'taps_500', title: 'Wytrzymały nadgarstek', target: 500, reward: 1900, field: 'sessionTaps' }
+  { id: 'taps_400', title: 'Odmrażanie palców', target: 400, reward: 900, field: 'sessionTaps' },
+  { id: 'buys_4', title: 'Kosmiczny serwis', target: 4, reward: 2200, field: 'sessionBuys' },
+  { id: 'spins_2', title: 'Stały bywalec Kasyna', target: 2, reward: 3200, field: 'sessionSpins' },
+  { id: 'taps_1000', title: 'Żelazny nadgarstek', target: 1000, reward: 3800, field: 'sessionTaps' }
 ];
 
 const ACHIEVEMENTS = [
-  { id: 'taps_500', name: 'Rozgrzany Palec', icon: '👆', desc: 'Kliknij prezent 500 razy.', check: (s) => (s.taps || 0) >= 500 },
-  { id: 'taps_2500', name: 'Weteran Klikania', icon: '⚡', desc: 'Kliknij prezent 2500 razy.', check: (s) => (s.taps || 0) >= 2500 },
-  { id: 'magic_50k', name: 'Świąteczny Przedsiębiorca', icon: '💼', desc: 'Zbierz łącznie 50 000 Magii.', check: (s) => (s.totalMagicEarned || 0) >= 50000 },
-  { id: 'magic_250k', name: 'Magnat Bieguna', icon: '💰', desc: 'Zbierz łącznie 250 000 Magii.', check: (s) => (s.totalMagicEarned || 0) >= 250000 },
-  { id: 'maverick_12', name: 'Konwój na LPG', icon: '🛻', desc: 'Posiadaj 12 Mavericków w LPG.', check: (s) => (s.maverick || 0) >= 12 },
-  { id: 'saboteur_5', name: 'Mistrz Sabotażu', icon: '🧌', desc: 'Wykonaj 5 akcji specjalnych na rywalu.', check: (s) => (s.actionsUsed || 0) >= 5 },
-  { id: 'prestige_1', name: 'Pierwszy Dzwonek', icon: '🔔', desc: 'Wykonaj Prestiż i zdobądź Złoty Dzwonek.', check: (s) => (s.bells || 0) >= 1 }
+  { id: 'taps_1500', name: 'Rozgrzany Palec', icon: '👆', desc: 'Kliknij prezent 1500 razy.', check: (s) => (s.taps || 0) >= 1500 },
+  { id: 'taps_6000', name: 'Weteran Klikania', icon: '⚡', desc: 'Kliknij prezent 6000 razy.', check: (s) => (s.taps || 0) >= 6000 },
+  { id: 'magic_150k', name: 'Świąteczny Przedsiębiorca', icon: '💼', desc: 'Zbierz łącznie 150 000 Magii.', check: (s) => (s.totalMagicEarned || 0) >= 150000 },
+  { id: 'magic_750k', name: 'Magnat Bieguna', icon: '💰', desc: 'Zbierz łącznie 750 000 Magii.', check: (s) => (s.totalMagicEarned || 0) >= 750000 },
+  { id: 'maverick_20', name: 'Konwój na LPG', icon: '🛻', desc: 'Posiadaj 20 Mavericków w LPG.', check: (s) => (s.maverick || 0) >= 20 },
+  { id: 'saboteur_10', name: 'Mistrz Sabotażu', icon: '🧌', desc: 'Wykonaj 10 akcji specjalnych na rywalu.', check: (s) => (s.actionsUsed || 0) >= 10 },
+  { id: 'prestige_2', name: 'Podwójny Dzwonek', icon: '🔔', desc: 'Zdobądź łącznie 2 Złote Dzwonki.', check: (s) => (s.bells || 0) >= 2 }
 ];
 
 const createFreshPlayerDoc = (ts = Date.now()) => ({
@@ -52,6 +52,7 @@ const createFreshPlayerDoc = (ts = Date.now()) => ({
   achievements: [],
   frozenUntil: 0,
   boostUntil: 0,
+  underfunded: false,
   lastUpdate: ts
 });
 
@@ -66,6 +67,7 @@ export default function Game() {
   const [glovesLevel, setGlovesLevel] = useState(0);
   const [bells, setBells] = useState(0);
   const [casinoLastSpin, setCasinoLastSpin] = useState(0);
+  const [underfunded, setUnderfunded] = useState(false);
   const [stats, setStats] = useState({ taps: 0, totalMagicEarned: 0, actionsUsed: 0, achievements: [] });
 
   const [questIndex, setQuestIndex] = useState(0);
@@ -76,24 +78,24 @@ export default function Game() {
     stara: createFreshPlayerDoc(0)
   });
 
-  const [offlineGains, setOfflineGains] = useState(0);
+  const [offlineSummary, setOfflineSummary] = useState(null);
   const [frenzyUntil, setFrenzyUntil] = useState(0);
   const [goldenReindeer, setGoldenReindeer] = useState(null);
   const [actionToast, setActionToast] = useState('');
   const [celebrateMedal, setCelebrateMedal] = useState(null);
   const [now, setNow] = useState(Date.now());
 
-  const stateRef = useRef({ magic, inventory, glovesLevel, bells, casinoLastSpin, stats, player });
+  const stateRef = useRef({ magic, inventory, glovesLevel, bells, casinoLastSpin, underfunded, stats, player });
   useEffect(() => {
-    stateRef.current = { magic, inventory, glovesLevel, bells, casinoLastSpin, stats, player };
-  }, [magic, inventory, glovesLevel, bells, casinoLastSpin, stats, player]);
+    stateRef.current = { magic, inventory, glovesLevel, bells, casinoLastSpin, underfunded, stats, player };
+  }, [magic, inventory, glovesLevel, bells, casinoLastSpin, underfunded, stats, player]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  // Jednorazowe wyzerowanie statystyk w bazie pod nową, trudniejszą ekonomię
+  // Jednorazowy twardy reset pod tryb Hardcore
   useEffect(() => {
     let active = true;
     const syncAndMaybeReset = async () => {
@@ -132,37 +134,45 @@ export default function Game() {
   const hasChocolateBoost = !!(myData && myData.boostUntil && myData.boostUntil > now);
   const hasFrenzy = frenzyUntil > now;
 
-  const getBaseCPS = () => {
-    const raw = (inventory.elf * UPGRADES.elf.cps) +
-                (inventory.reindeer * UPGRADES.reindeer.cps) +
-                (inventory.maverick * UPGRADES.maverick.cps) +
-                (inventory.lexus * UPGRADES.lexus.cps);
-    const prestigeMult = 1 + (bells * 0.15);
-    return Math.floor(raw * prestigeMult);
+  const getUpkeepPerMin = (inv = inventory) => {
+    return (inv.elf * UPGRADES.elf.upkeepPerMin) +
+           (inv.reindeer * UPGRADES.reindeer.upkeepPerMin) +
+           (inv.maverick * UPGRADES.maverick.upkeepPerMin) +
+           (inv.lexus * UPGRADES.lexus.upkeepPerMin);
+  };
+
+  const getBaseCPS = (inv = inventory, bellCount = bells, isLowFuel = underfunded) => {
+    const raw = (inv.elf * UPGRADES.elf.cps) +
+                (inv.reindeer * UPGRADES.reindeer.cps) +
+                (inv.maverick * UPGRADES.maverick.cps) +
+                (inv.lexus * UPGRADES.lexus.cps);
+    const prestigeMult = 1 + (bellCount * 0.08);
+    const fuelMult = isLowFuel ? 0.5 : 1;
+    return Math.floor(raw * prestigeMult * fuelMult);
   };
 
   const getCurrentCPS = () => {
     if (isFrozen) return 0;
     let mult = 1;
     if (hasChocolateBoost) mult *= 2;
-    if (hasFrenzy) mult *= 5;
+    if (hasFrenzy) mult *= 4;
     return Math.floor(getBaseCPS() * mult);
   };
 
   const getTapPower = () => {
     const baseCps = getBaseCPS();
-    const passiveBonus = Math.floor(baseCps * 0.012 * glovesLevel);
-    let power = Math.floor((1 + (glovesLevel * 1.5) + passiveBonus) * (1 + (bells * 0.15)));
-    if (hasFrenzy) power *= 5;
-    return Math.max(1, power);
+    const passiveBonus = Math.floor(baseCps * 0.008 * glovesLevel);
+    const power = Math.floor((1 + (glovesLevel * 1.1) + passiveBonus) * (1 + (bells * 0.08)));
+    const mult = hasFrenzy ? 4 : 1;
+    return Math.max(1, power * mult);
   };
 
-  const getCost = (id) => Math.floor(UPGRADES[id].baseCost * Math.pow(1.22, inventory[id]));
-  const getGlovesCost = () => Math.floor(GLOVES_BASE_COST * Math.pow(1.48, glovesLevel));
+  const getCost = (id) => Math.floor(UPGRADES[id].baseCost * Math.pow(1.28, inventory[id]));
+  const getGlovesCost = () => Math.floor(GLOVES_BASE_COST * Math.pow(1.58, glovesLevel));
 
   const showToast = (msg) => {
     setActionToast(msg);
-    setTimeout(() => setActionToast(''), 3800);
+    setTimeout(() => setActionToast(''), 4200);
   };
 
   const evaluateAchievements = async (candidateStats, currentInv, currentBells = bells) => {
@@ -229,26 +239,42 @@ export default function Game() {
       const wasFrozen = d.frozenUntil && d.frozenUntil > lastTs;
       const effectiveEnd = wasFrozen ? Math.min(currentNow, d.frozenUntil) : currentNow;
       const diffSeconds = Math.max(0, Math.floor((effectiveEnd - lastTs) / 1000));
+      const elapsedMinutes = Math.floor(Math.max(0, currentNow - lastTs) / 60000);
+
+      const upkeepPerMin = getUpkeepPerMin(savedInv);
+      const totalUpkeep = elapsedMinutes * upkeepPerMin;
 
       const rawCps = (savedInv.elf * UPGRADES.elf.cps) +
                      (savedInv.reindeer * UPGRADES.reindeer.cps) +
                      (savedInv.maverick * UPGRADES.maverick.cps) +
                      (savedInv.lexus * UPGRADES.lexus.cps);
-      const prestigeMult = 1 + (savedBells * 0.15);
+      const prestigeMult = 1 + (savedBells * 0.08);
       const mult = (d.boostUntil && d.boostUntil > currentNow) ? 2 : 1;
-      const earned = wasFrozen ? 0 : Math.floor(diffSeconds * rawCps * prestigeMult * mult);
+      const grossEarned = wasFrozen ? 0 : Math.floor(diffSeconds * rawCps * prestigeMult * mult);
 
-      const updatedMagic = (d.magic || 0) + earned;
-      const updatedTotal = savedStats.totalMagicEarned + earned;
+      let finalMagic = (d.magic || 0) + grossEarned - totalUpkeep;
+      let isLow = false;
+      if (finalMagic < 0) {
+        finalMagic = 0;
+        isLow = true;
+      }
 
-      setMagic(updatedMagic);
-      setOfflineGains(earned);
+      const updatedTotal = savedStats.totalMagicEarned + grossEarned;
+      setMagic(finalMagic);
+      setUnderfunded(isLow);
       const nextStats = { ...savedStats, totalMagicEarned: updatedTotal };
       setStats(nextStats);
 
+      if (grossEarned > 0 || totalUpkeep > 0) {
+        setOfflineSummary({ earned: grossEarned, upkeep: totalUpkeep, isLow });
+      } else {
+        setOfflineSummary(null);
+      }
+
       await updateDoc(docRef, {
-        magic: updatedMagic,
+        magic: finalMagic,
         totalMagicEarned: updatedTotal,
+        underfunded: isLow,
         lastUpdate: currentNow
       });
 
@@ -261,8 +287,9 @@ export default function Game() {
       setGlovesLevel(0);
       setBells(0);
       setCasinoLastSpin(0);
+      setUnderfunded(false);
       setStats({ taps: 0, totalMagicEarned: 0, actionsUsed: 0, achievements: [] });
-      setOfflineGains(0);
+      setOfflineSummary(null);
     }
 
     setGameState('playing');
@@ -283,7 +310,28 @@ export default function Game() {
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [gameState, inventory, bells, isFrozen, hasChocolateBoost, hasFrenzy]);
+  }, [gameState, inventory, bells, underfunded, isFrozen, hasChocolateBoost, hasFrenzy]);
+
+  // Koszt utrzymania co 60 sekund w trakcie gry
+  useEffect(() => {
+    if (gameState !== 'playing' || !player) return;
+    const upkeepTimer = setInterval(async () => {
+      const snap = stateRef.current;
+      const costPerMin = getUpkeepPerMin(snap.inventory);
+      if (costPerMin <= 0) return;
+
+      setMagic(prev => {
+        if (prev >= costPerMin) {
+          setUnderfunded(false);
+          return prev - costPerMin;
+        }
+        setUnderfunded(true);
+        showToast(`Brakuje Magii na utrzymanie floty (-${costPerMin}/min)! Produkcja spadła o 50%! ⚠️`);
+        return 0;
+      });
+    }, 60000);
+    return () => clearInterval(upkeepTimer);
+  }, [gameState, player]);
 
   // Okresowy zapis do chmury
   useEffect(() => {
@@ -295,6 +343,7 @@ export default function Game() {
           magic: snap.magic,
           totalMagicEarned: snap.stats.totalMagicEarned,
           taps: snap.stats.taps,
+          underfunded: snap.underfunded,
           lastUpdate: Date.now()
         });
       } catch (e) {}
@@ -302,7 +351,7 @@ export default function Game() {
     return () => clearInterval(saveTimer);
   }, [gameState, player]);
 
-  // Złoty Renifer
+  // Złoty Renifer (rzadszy i krótsze okno na złapanie)
   useEffect(() => {
     if (gameState !== 'playing') {
       setGoldenReindeer(null);
@@ -310,7 +359,7 @@ export default function Game() {
     }
     let hideTimeout;
     const scheduleReindeer = () => {
-      const delay = 55000 + Math.floor(Math.random() * 55000);
+      const delay = 75000 + Math.floor(Math.random() * 75000);
       return setTimeout(() => {
         setGoldenReindeer({
           top: 24 + Math.floor(Math.random() * 42),
@@ -318,7 +367,7 @@ export default function Game() {
         });
         hideTimeout = setTimeout(() => {
           setGoldenReindeer(null);
-        }, 5000);
+        }, 3500);
         nextSpawn = scheduleReindeer();
       }, delay);
     };
@@ -337,6 +386,7 @@ export default function Game() {
       const nextMagic = currentMagic + reward;
       const nextTotal = (stats.totalMagicEarned || 0) + reward;
       setMagic(nextMagic);
+      setUnderfunded(false);
       const nextStats = { ...stats, totalMagicEarned: nextTotal };
       setStats(nextStats);
       setQuestProgress({ sessionTaps: 0, sessionBuys: 0, sessionSpins: 0 });
@@ -348,6 +398,7 @@ export default function Game() {
           await updateDoc(doc(db, "factory", player), {
             magic: nextMagic,
             totalMagicEarned: nextTotal,
+            underfunded: false,
             lastUpdate: Date.now()
           });
         } catch (e) {}
@@ -360,11 +411,12 @@ export default function Game() {
   const handleCatchReindeer = async () => {
     if (!goldenReindeer) return;
     setGoldenReindeer(null);
-    if (Math.random() < 0.5) {
-      const instantBonus = Math.max(250, getBaseCPS() * 90);
+    if (Math.random() < 0.45) {
+      const instantBonus = Math.max(300, getBaseCPS() * 60);
       const nextMagic = magic + instantBonus;
       const nextTotal = (stats.totalMagicEarned || 0) + instantBonus;
       setMagic(nextMagic);
+      setUnderfunded(false);
       const nextStats = { ...stats, totalMagicEarned: nextTotal };
       setStats(nextStats);
       showToast(`Złoty Renifer! +${instantBonus} Magii! 🦌✨`);
@@ -374,13 +426,14 @@ export default function Game() {
           await updateDoc(doc(db, "factory", player), {
             magic: nextMagic,
             totalMagicEarned: nextTotal,
+            underfunded: false,
             lastUpdate: Date.now()
           });
         } catch (e) {}
       }
     } else {
-      setFrenzyUntil(Date.now() + 18000);
-      showToast("GORĄCZKA ŚWIĄT! x5 produkcji i kliknięć przez 18s! 🔥");
+      setFrenzyUntil(Date.now() + 14000);
+      showToast("GORĄCZKA ŚWIĄT! x4 produkcji i kliknięć przez 14s! 🔥");
     }
   };
 
@@ -388,6 +441,9 @@ export default function Game() {
     const gain = getTapPower();
     const nextMagic = magic + gain;
     setMagic(nextMagic);
+    if (underfunded && nextMagic >= getUpkeepPerMin()) {
+      setUnderfunded(false);
+    }
     const nextStats = {
       ...stats,
       taps: (stats.taps || 0) + 1,
@@ -409,6 +465,7 @@ export default function Game() {
     const nextInv = { ...inventory, [id]: inventory[id] + 1 };
     setMagic(nextMagic);
     setInventory(nextInv);
+    setUnderfunded(false);
 
     const nextProg = { ...questProgress, sessionBuys: questProgress.sessionBuys + 1 };
     setQuestProgress(nextProg);
@@ -420,6 +477,7 @@ export default function Game() {
       await updateDoc(doc(db, "factory", player), {
         magic: finalMagic,
         [id]: nextInv[id],
+        underfunded: false,
         lastUpdate: Date.now()
       });
     } catch (e) {}
@@ -432,6 +490,7 @@ export default function Game() {
     const nextLevel = glovesLevel + 1;
     setMagic(nextMagic);
     setGlovesLevel(nextLevel);
+    setUnderfunded(false);
 
     const nextProg = { ...questProgress, sessionBuys: questProgress.sessionBuys + 1 };
     setQuestProgress(nextProg);
@@ -441,13 +500,14 @@ export default function Game() {
       await updateDoc(doc(db, "factory", player), {
         magic: finalMagic,
         glovesLevel: nextLevel,
+        underfunded: false,
         lastUpdate: Date.now()
       });
     } catch (e) {}
   };
 
   const handleSabotage = async (type) => {
-    const cost = type === 'freeze' ? 4000 : 2500;
+    const cost = type === 'freeze' ? 6500 : 4000;
     if (magic < cost || !opponent) return;
 
     const nextMagic = magic - cost;
@@ -470,14 +530,14 @@ export default function Game() {
         const baseFrozen = oppSnap.exists() && oppSnap.data().frozenUntil > currentNow
           ? oppSnap.data().frozenUntil
           : currentNow;
-        await setDoc(oppRef, { frozenUntil: baseFrozen + (15 * 60 * 1000), lastUpdate: currentNow }, { merge: true });
-        showToast(`Atak Grincha! Fabryka (${opponent.toUpperCase()}) zamrożona na 15 min! 🧌❄️`);
+        await setDoc(oppRef, { frozenUntil: baseFrozen + (25 * 60 * 1000), lastUpdate: currentNow }, { merge: true });
+        showToast(`Atak Grincha! Fabryka (${opponent.toUpperCase()}) zamrożona na 25 min! 🧌❄️`);
       } else {
         const baseBoost = oppSnap.exists() && oppSnap.data().boostUntil > currentNow
           ? oppSnap.data().boostUntil
           : currentNow;
-        await setDoc(oppRef, { boostUntil: baseBoost + (45 * 60 * 1000), lastUpdate: currentNow }, { merge: true });
-        showToast(`Gorąca Czekolada dla (${opponent.toUpperCase()})! Produkcja x2 przez 45 min! ☕✨`);
+        await setDoc(oppRef, { boostUntil: baseBoost + (30 * 60 * 1000), lastUpdate: currentNow }, { merge: true });
+        showToast(`Gorąca Czekolada dla (${opponent.toUpperCase()})! Produkcja x2 przez 30 min! ☕✨`);
       }
     } catch (e) {
       showToast("Nie udało się wysłać akcji do bazy.");
@@ -498,26 +558,27 @@ export default function Game() {
     let outcomeMagic = afterCost;
     let nextTotal = stats.totalMagicEarned || 0;
 
-    if (roll < 0.25) {
-      const win = 4200;
+    if (roll < 0.18) {
+      const win = 6500;
       outcomeMagic = afterCost + win;
       nextTotal += win;
       showToast(`Kasyno Elfa: Worek Magii! +${win} ✨`);
-    } else if (roll < 0.45) {
-      setFrenzyUntil(spinNow + 120000);
+    } else if (roll < 0.32) {
+      setFrenzyUntil(spinNow + 90000);
       outcomeMagic = afterCost;
-      showToast("Kasyno Elfa: JACKPOT! x3 produkcji i kliknięć przez 2 min! 🎰🔥");
-    } else if (roll < 0.75) {
+      showToast("Kasyno Elfa: JACKPOT! x4 przez 90s! 🎰🔥");
+    } else if (roll < 0.72) {
       outcomeMagic = afterCost;
-      showToast("Kasyno Elfa: Pudło... Elf zjadł ciastko. 🍪");
+      showToast("Kasyno Elfa: Pudło... Elf zwinął resztę. 🍪");
     } else {
-      outcomeMagic = afterCost;
+      const penaltyLoss = Math.min(afterCost, 1500);
+      outcomeMagic = afterCost - penaltyLoss;
       try {
         await updateDoc(doc(db, "factory", player), {
-          frozenUntil: spinNow + (5 * 60 * 1000)
+          frozenUntil: spinNow + (10 * 60 * 1000)
         });
       } catch (e) {}
-      showToast("Kasyno Elfa: Przekleństwo Grincha! Zamrożenie na 5 min! 🧌❄️");
+      showToast(`Przekleństwo Grincha! Zamrożenie 10 min i strata ${penaltyLoss} ✨! 🧌❄️`);
     }
 
     setMagic(outcomeMagic);
@@ -544,7 +605,7 @@ export default function Game() {
 
   const handlePrestige = async () => {
     if (earnedBellsPreview < 1 || !player) return;
-    if (!window.confirm(`Wykonujesz Prestiż? Zresetuje to budynki i bieżącą Magię, ale zdobędziesz +${earnedBellsPreview} Złoty Dzwonek (+15% za każdy dzwonek na stałe).`)) {
+    if (!window.confirm(`Wykonujesz Prestiż? Zresetuje to budynki i bieżącą Magię, ale zdobędziesz +${earnedBellsPreview} Złoty Dzwonek (+8% za każdy dzwonek na stałe).`)) {
       return;
     }
 
@@ -556,9 +617,10 @@ export default function Game() {
     setMagic(0);
     setInventory(emptyInv);
     setGlovesLevel(0);
+    setUnderfunded(false);
     setFrenzyUntil(0);
 
-    showToast(`Prestiż ukończony! Masz teraz ${nextBells} Złote Dzwonki (+${nextBells * 15}%)! 🔔✨`);
+    showToast(`Prestiż ukończony! Masz teraz ${nextBells} Złote Dzwonki (+${nextBells * 8}%)! 🔔✨`);
     await evaluateAchievements(stats, emptyInv, nextBells);
 
     try {
@@ -571,6 +633,7 @@ export default function Game() {
         glovesLevel: 0,
         bells: nextBells,
         frozenUntil: 0,
+        underfunded: false,
         lastUpdate: ts
       });
     } catch (e) {}
@@ -603,6 +666,7 @@ export default function Game() {
   const unlockedSet = new Set(stats.achievements || []);
   const activeQuest = QUEST_TEMPLATES[questIndex];
   const currentQuestVal = questProgress[activeQuest.field] || 0;
+  const currentUpkeep = getUpkeepPerMin();
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-950 via-slate-900 to-black p-4 flex flex-col items-center relative overflow-hidden font-sans select-none">
@@ -647,8 +711,8 @@ export default function Game() {
             <h1 className="text-4xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-b from-amber-200 to-amber-400 font-extrabold mb-2 font-serif text-center drop-shadow-md">
               Fabryka Mikołaja 🏭
             </h1>
-            <p className="text-blue-200/70 mb-6 italic text-xs md:text-sm text-center">
-              Nowy sezon, wyższe stawki i twardsza ekonomia. Liczy się strategia!
+            <p className="text-red-300/80 mb-6 italic text-xs md:text-sm text-center">
+              Tryb Hardcore: koszty utrzymania floty, drogie ulepszenia i bezlitosne kasyno.
             </p>
 
             {/* PASEK PRZEWAGI */}
@@ -676,6 +740,7 @@ export default function Game() {
                     <span className="font-bold text-white uppercase tracking-wider text-lg block">Stary</span>
                     <span className="text-[11px] text-slate-300">
                       🔔 {leaderboard.stary?.bells || 0} • Medale: {(leaderboard.stary?.achievements || []).length}/{ACHIEVEMENTS.length}
+                      {leaderboard.stary?.underfunded && <span className="ml-2 text-red-400 font-bold">⚠️ Deficyt</span>}
                       {leaderboard.stary?.frozenUntil > now && <span className="ml-2 text-cyan-300 font-bold">❄️ Zamrożony</span>}
                       {leaderboard.stary?.boostUntil > now && <span className="ml-2 text-amber-300 font-bold">☕ x2</span>}
                     </span>
@@ -688,6 +753,7 @@ export default function Game() {
                     <span className="font-bold text-white uppercase tracking-wider text-lg block">Stara</span>
                     <span className="text-[11px] text-slate-300">
                       🔔 {leaderboard.stara?.bells || 0} • Medale: {(leaderboard.stara?.achievements || []).length}/{ACHIEVEMENTS.length}
+                      {leaderboard.stara?.underfunded && <span className="ml-2 text-red-400 font-bold">⚠️ Deficyt</span>}
                       {leaderboard.stara?.frozenUntil > now && <span className="ml-2 text-cyan-300 font-bold">❄️ Zamrożona</span>}
                       {leaderboard.stara?.boostUntil > now && <span className="ml-2 text-amber-300 font-bold">☕ x2</span>}
                     </span>
@@ -700,7 +766,7 @@ export default function Game() {
             {/* ŚCIANA CHWAŁY */}
             <div className="bg-black/40 border border-white/10 rounded-3xl p-5 w-full mb-7 backdrop-blur-md">
               <h3 className="text-amber-300 font-bold tracking-widest uppercase mb-4 text-xs text-center">
-                🎖️ Ściana Chwały (Trudne Osiągnięcia)
+                🎖️ Ściana Chwały (Hardcore)
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {ACHIEVEMENTS.map(ach => {
@@ -743,7 +809,7 @@ export default function Game() {
             <div className="bg-black/60 backdrop-blur-xl border-b border-amber-500/30 w-screen fixed top-0 left-0 px-4 py-3 flex justify-between items-center z-20 shadow-xl">
               <div className="flex flex-col">
                 <span className="text-[10px] text-amber-200/60 uppercase tracking-widest font-bold">
-                  {player?.toUpperCase()} • 🔔 {bells} (+{bells * 15}%)
+                  {player?.toUpperCase()} • 🔔 {bells} (+{bells * 8}%) • 🛠️ -{currentUpkeep}/min
                 </span>
                 <span className="text-2xl md:text-3xl text-amber-400 font-mono font-bold">
                   {Math.floor(magic)} ✨
@@ -759,8 +825,13 @@ export default function Game() {
               </div>
             </div>
 
-            {/* AKTYWNE EFEKTY */}
+            {/* AKTYWNE EFEKTY / OSTRZEŻENIA */}
             <div className="mt-20 w-full flex flex-wrap gap-2 justify-center">
+              {underfunded && (
+                <div className="bg-red-950/90 border border-red-500 text-red-200 px-4 py-2 rounded-full text-xs font-bold">
+                  ⚠️ Brak paliwa na utrzymanie! Produkcja -50%
+                </div>
+              )}
               {isFrozen && (
                 <div className="bg-cyan-950/90 border border-cyan-400 text-cyan-200 px-4 py-2 rounded-full text-xs font-bold">
                   ❄️ Zamrożony! ({formatTimer(myData.frozenUntil)})
@@ -773,17 +844,19 @@ export default function Game() {
               )}
               {hasFrenzy && (
                 <div className="bg-orange-950/90 border border-orange-400 text-orange-200 px-4 py-2 rounded-full text-xs font-bold animate-pulse">
-                  🔥 GORĄCZKA x5! ({formatTimer(frenzyUntil)})
+                  🔥 GORĄCZKA x4! ({formatTimer(frenzyUntil)})
                 </div>
               )}
             </div>
 
-            {/* ZYSKI OFFLINE */}
-            {offlineGains > 0 && (
-              <div className="bg-emerald-900/80 border border-emerald-400 text-emerald-100 p-4 rounded-2xl w-full mt-3 text-center shadow-lg">
-                <p className="font-bold text-xs uppercase tracking-widest mb-1">Zyski Offline!</p>
-                <p className="text-xs">Podczas nieobecności fabryka wyprodukowała <strong>{offlineGains}</strong> magii! ✨</p>
-                <button onClick={() => setOfflineGains(0)} className="mt-3 bg-emerald-700 hover:bg-emerald-600 text-xs px-6 py-2 rounded-full font-bold">Odbierz</button>
+            {/* BILANS OFFLINE */}
+            {offlineSummary && (
+              <div className="bg-slate-900/90 border border-amber-400/60 text-slate-100 p-4 rounded-2xl w-full mt-3 text-center shadow-lg">
+                <p className="font-bold text-xs uppercase tracking-widest mb-1 text-amber-300">Raport Nieobecności</p>
+                <p className="text-xs">
+                  Wyprodukowano: <strong>+{offlineSummary.earned} ✨</strong> • Koszt utrzymania: <strong className="text-red-300">-{offlineSummary.upkeep} ✨</strong>
+                </p>
+                <button onClick={() => setOfflineSummary(null)} className="mt-3 bg-amber-600 hover:bg-amber-500 text-white text-xs px-6 py-2 rounded-full font-bold">Przyjąłem</button>
               </div>
             )}
 
@@ -820,7 +893,7 @@ export default function Game() {
                   <div className="text-3xl bg-white/5 p-2 rounded-xl border border-white/10">🧤</div>
                   <div className="flex flex-col">
                     <span className="font-bold text-white text-sm">Świąteczne Rękawice (Poz. {glovesLevel})</span>
-                    <span className="text-[10px] text-slate-400">+1.5 mocy tapnięcia i +1.2% produkcji/s za poziom.</span>
+                    <span className="text-[10px] text-slate-400">+1.1 mocy tapnięcia i +0.8% produkcji/s za poziom.</span>
                     <span className="text-xs text-sky-400 font-bold mt-1">Moc kliknięcia: +{getTapPower()}</span>
                   </div>
                 </div>
@@ -839,7 +912,7 @@ export default function Game() {
             <div className="w-full bg-slate-900/60 backdrop-blur-md rounded-3xl p-4 border border-white/10 shadow-2xl mb-5">
               <h3 className="text-white/80 font-bold mb-4 uppercase tracking-widest text-xs flex justify-between px-2">
                 <span>Sklep Ulepszeń</span>
-                <span className="text-amber-500/70">Produkcja pasywna</span>
+                <span className="text-red-400/80">Wymaga paliwa</span>
               </h3>
 
               <div className="flex flex-col gap-3">
@@ -876,10 +949,10 @@ export default function Game() {
             {/* KASYNO ELFA */}
             <div className="w-full bg-slate-900/60 backdrop-blur-md rounded-3xl p-4 border border-amber-500/25 shadow-xl mb-5">
               <h3 className="text-amber-300 font-bold mb-2 uppercase tracking-widest text-xs px-1">
-                🎰 Kasyno Elfa (Ryzyko)
+                🎰 Kasyno Elfa (Wysokie Ryzyko)
               </h3>
               <p className="text-[11px] text-slate-400 mb-3 px-1">
-                Możesz wygrać worek Magii lub x3 na 2 min, ale grozi też pudło albo 5-minutowe zamrożenie.
+                Ryzykowny obrót: mała szansa na worek lub x4, duża na pudło albo zamrożenie 10 min + stratę 1500 ✨.
               </p>
               <button
                 onClick={handleSpinCasino}
@@ -901,22 +974,22 @@ export default function Game() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
                   onClick={() => handleSabotage('freeze')}
-                  disabled={magic < 4000}
-                  className={`p-3 rounded-2xl border text-left transition-all ${magic >= 4000 ? 'bg-cyan-950/50 border-cyan-500/50 hover:bg-cyan-900/50 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-500 opacity-50'}`}
+                  disabled={magic < 6500}
+                  className={`p-3 rounded-2xl border text-left transition-all ${magic >= 6500 ? 'bg-cyan-950/50 border-cyan-500/50 hover:bg-cyan-900/50 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-500 opacity-50'}`}
                 >
                   <div className="font-bold text-sm">🧌 Atak Grincha</div>
-                  <div className="text-[10px] text-slate-300 my-1">Zamraża produkcję przeciwnika na 15 min.</div>
-                  <div className="text-xs font-mono font-bold text-cyan-300">4000 ✨</div>
+                  <div className="text-[10px] text-slate-300 my-1">Zamraża produkcję przeciwnika na 25 min.</div>
+                  <div className="text-xs font-mono font-bold text-cyan-300">6500 ✨</div>
                 </button>
 
                 <button
                   onClick={() => handleSabotage('chocolate')}
-                  disabled={magic < 2500}
-                  className={`p-3 rounded-2xl border text-left transition-all ${magic >= 2500 ? 'bg-amber-950/50 border-amber-500/50 hover:bg-amber-900/50 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-500 opacity-50'}`}
+                  disabled={magic < 4000}
+                  className={`p-3 rounded-2xl border text-left transition-all ${magic >= 4000 ? 'bg-amber-950/50 border-amber-500/50 hover:bg-amber-900/50 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-500 opacity-50'}`}
                 >
                   <div className="font-bold text-sm">☕ Gorąca Czekolada</div>
-                  <div className="text-[10px] text-slate-300 my-1">Daje przeciwnikowi x2 produkcji na 45 min.</div>
-                  <div className="text-xs font-mono font-bold text-amber-300">2500 ✨</div>
+                  <div className="text-[10px] text-slate-300 my-1">Daje przeciwnikowi x2 produkcji na 30 min.</div>
+                  <div className="text-xs font-mono font-bold text-amber-300">4000 ✨</div>
                 </button>
               </div>
             </div>
@@ -927,7 +1000,7 @@ export default function Game() {
                 🔔 Prestiż – Złote Dzwonki
               </h3>
               <p className="text-[11px] text-slate-400 mb-3 px-1">
-                Próg: {PRESTIGE_THRESHOLD} Magii = 1 Złoty Dzwonek (+15% stałej premii do produkcji i kliknięć).
+                Próg: {PRESTIGE_THRESHOLD} Magii = 1 Złoty Dzwonek (+8% stałej premii do produkcji i kliknięć).
               </p>
               <button
                 onClick={handlePrestige}
