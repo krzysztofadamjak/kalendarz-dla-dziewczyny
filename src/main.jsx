@@ -6,7 +6,8 @@ import Admin from './admin.jsx'
 import Home from './Home.jsx'
 import Test from './Test.jsx'
 import Regulamin from './Regulamin.jsx'
-import Wallet from './Wallet.jsx' // IMPORT NOWEJ ZAKŁADKI PORTFELA
+import Wallet from './Wallet.jsx'
+import Game from './Game.jsx' // IMPORT GRY
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -18,7 +19,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/test" element={<Test />} />
         <Route path="/test/:dayId" element={<App />} />
         <Route path="/regulamin" element={<Regulamin />} />
-        <Route path="/portfel" element={<Wallet />} /> {/* NOWA TRASA DO PORTFELA */}
+        <Route path="/portfel" element={<Wallet />} />
+        <Route path="/gra" element={<Game />} /> {/* TRASA GRY */}
         <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<Home />} />
       </Routes>
