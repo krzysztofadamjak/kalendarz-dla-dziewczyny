@@ -6,7 +6,7 @@ import Snowfall from 'react-snowfall';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
 
-const RESET_FLAG_KEY = 'factory_hard_reset_v3_2026';
+const RESET_FLAG_KEY = 'factory_hard_reset_v4_2026';
 
 const UPGRADES = {
   elf: { id: 'elf', name: 'Scenic', baseCost: 60, cps: 1, upkeepPerMin: 1, icon: '🚐', desc: '+1 Magia/s • Utrzymanie: 1/min' },
@@ -38,6 +38,7 @@ const ACHIEVEMENTS = [
 ];
 
 const createFreshPlayerDoc = (ts = Date.now()) => ({
+  pin: '',
   magic: 0,
   elf: 0,
   reindeer: 0,
@@ -59,8 +60,14 @@ const createFreshPlayerDoc = (ts = Date.now()) => ({
 export default function Game() {
   const { width, height } = useWindowSize();
 
+  // STANY: 'menu', 'auth_setup', 'auth_login', 'loading', 'playing'
   const [gameState, setGameState] = useState('menu');
-  const [player, setPlayer] = useState(null);
+  const [player, setPlayer] = useState(null); // 'stary' lub 'stara'
+
+  // HASŁO KONTA GRACZA
+  const [pinInput, setPinInput] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
+  const [authError, setAuthError] = useState('');
 
   const [magic, setMagic] = useState(0);
   const [inventory, setInventory] = useState({ elf: 0, reindeer: 0, maverick: 0, lexus: 0 });
@@ -95,9 +102,11 @@ export default function Game() {
     return () => clearInterval(t);
   }, []);
 
-  // Jednorazowy twardy reset pod tryb Hardcore
+  // Natychmiastowy twardy reset statystyk i haseł graczy w bazie
   useEffect(() => {
     let active = true;
+    let unsub = null;
+
     const syncAndMaybeReset = async () => {
       const currentNow = Date.now();
       if (!localStorage.getItem(RESET_FLAG_KEY)) {
@@ -112,7 +121,7 @@ export default function Game() {
       }
 
       if (!active) return;
-      onSnapshot(collection(db, "factory"), (snapshot) => {
+      unsub = onSnapshot(collection(db, "factory"), (snapshot) => {
         const lb = {
           stary: createFreshPlayerDoc(0),
           stara: createFreshPlayerDoc(0)
@@ -125,7 +134,10 @@ export default function Game() {
     };
 
     syncAndMaybeReset();
-    return () => { active = false; };
+    return () => {
+      active = false;
+      if (unsub) unsub();
+    };
   }, []);
 
   const opponent = player === 'stary' ? 'stara' : 'stary';
@@ -203,96 +215,152 @@ export default function Game() {
     return candidateStats;
   };
 
-  const handleStart = async (selectedPlayer) => {
-    setPlayer(selectedPlayer);
-    setGameState('loading');
+  const loadPlayerSession = async (selectedPlayer, rawData, currentNow) => {
+    const d = rawData || createFreshPlayerDoc(currentNow);
+    const savedInv = {
+      elf: d.elf || 0,
+      reindeer: d.reindeer || 0,
+      maverick: d.maverick || 0,
+      lexus: d.lexus || 0
+    };
+    const savedGloves = d.glovesLevel || 0;
+    const savedBells = d.bells || 0;
+    const savedSpin = d.casinoLastSpin || 0;
+    const savedStats = {
+      taps: d.taps || 0,
+      totalMagicEarned: d.totalMagicEarned || d.magic || 0,
+      actionsUsed: d.actionsUsed || 0,
+      achievements: d.achievements || []
+    };
 
-    const docRef = doc(db, "factory", selectedPlayer);
-    const docSnap = await getDoc(docRef);
-    const currentNow = Date.now();
+    setInventory(savedInv);
+    setGlovesLevel(savedGloves);
+    setBells(savedBells);
+    setCasinoLastSpin(savedSpin);
+    setStats(savedStats);
 
-    if (docSnap.exists()) {
-      const d = docSnap.data();
-      const savedInv = {
-        elf: d.elf || 0,
-        reindeer: d.reindeer || 0,
-        maverick: d.maverick || 0,
-        lexus: d.lexus || 0
-      };
-      const savedGloves = d.glovesLevel || 0;
-      const savedBells = d.bells || 0;
-      const savedSpin = d.casinoLastSpin || 0;
-      const savedStats = {
-        taps: d.taps || 0,
-        totalMagicEarned: d.totalMagicEarned || d.magic || 0,
-        actionsUsed: d.actionsUsed || 0,
-        achievements: d.achievements || []
-      };
+    const lastTs = d.lastUpdate || currentNow;
+    const wasFrozen = d.frozenUntil && d.frozenUntil > lastTs;
+    const effectiveEnd = wasFrozen ? Math.min(currentNow, d.frozenUntil) : currentNow;
+    const diffSeconds = Math.max(0, Math.floor((effectiveEnd - lastTs) / 1000));
+    const elapsedMinutes = Math.floor(Math.max(0, currentNow - lastTs) / 60000);
 
-      setInventory(savedInv);
-      setGlovesLevel(savedGloves);
-      setBells(savedBells);
-      setCasinoLastSpin(savedSpin);
-      setStats(savedStats);
+    const upkeepPerMin = getUpkeepPerMin(savedInv);
+    const totalUpkeep = elapsedMinutes * upkeepPerMin;
 
-      const lastTs = d.lastUpdate || currentNow;
-      const wasFrozen = d.frozenUntil && d.frozenUntil > lastTs;
-      const effectiveEnd = wasFrozen ? Math.min(currentNow, d.frozenUntil) : currentNow;
-      const diffSeconds = Math.max(0, Math.floor((effectiveEnd - lastTs) / 1000));
-      const elapsedMinutes = Math.floor(Math.max(0, currentNow - lastTs) / 60000);
+    const rawCps = (savedInv.elf * UPGRADES.elf.cps) +
+                   (savedInv.reindeer * UPGRADES.reindeer.cps) +
+                   (savedInv.maverick * UPGRADES.maverick.cps) +
+                   (savedInv.lexus * UPGRADES.lexus.cps);
+    const prestigeMult = 1 + (savedBells * 0.08);
+    const mult = (d.boostUntil && d.boostUntil > currentNow) ? 2 : 1;
+    const grossEarned = wasFrozen ? 0 : Math.floor(diffSeconds * rawCps * prestigeMult * mult);
 
-      const upkeepPerMin = getUpkeepPerMin(savedInv);
-      const totalUpkeep = elapsedMinutes * upkeepPerMin;
+    let finalMagic = (d.magic || 0) + grossEarned - totalUpkeep;
+    let isLow = false;
+    if (finalMagic < 0) {
+      finalMagic = 0;
+      isLow = true;
+    }
 
-      const rawCps = (savedInv.elf * UPGRADES.elf.cps) +
-                     (savedInv.reindeer * UPGRADES.reindeer.cps) +
-                     (savedInv.maverick * UPGRADES.maverick.cps) +
-                     (savedInv.lexus * UPGRADES.lexus.cps);
-      const prestigeMult = 1 + (savedBells * 0.08);
-      const mult = (d.boostUntil && d.boostUntil > currentNow) ? 2 : 1;
-      const grossEarned = wasFrozen ? 0 : Math.floor(diffSeconds * rawCps * prestigeMult * mult);
+    const updatedTotal = savedStats.totalMagicEarned + grossEarned;
+    setMagic(finalMagic);
+    setUnderfunded(isLow);
+    const nextStats = { ...savedStats, totalMagicEarned: updatedTotal };
+    setStats(nextStats);
 
-      let finalMagic = (d.magic || 0) + grossEarned - totalUpkeep;
-      let isLow = false;
-      if (finalMagic < 0) {
-        finalMagic = 0;
-        isLow = true;
-      }
-
-      const updatedTotal = savedStats.totalMagicEarned + grossEarned;
-      setMagic(finalMagic);
-      setUnderfunded(isLow);
-      const nextStats = { ...savedStats, totalMagicEarned: updatedTotal };
-      setStats(nextStats);
-
-      if (grossEarned > 0 || totalUpkeep > 0) {
-        setOfflineSummary({ earned: grossEarned, upkeep: totalUpkeep, isLow });
-      } else {
-        setOfflineSummary(null);
-      }
-
-      await updateDoc(docRef, {
-        magic: finalMagic,
-        totalMagicEarned: updatedTotal,
-        underfunded: isLow,
-        lastUpdate: currentNow
-      });
-
-      await evaluateAchievements(nextStats, savedInv, savedBells);
+    if (grossEarned > 0 || totalUpkeep > 0) {
+      setOfflineSummary({ earned: grossEarned, upkeep: totalUpkeep, isLow });
     } else {
-      const fresh = createFreshPlayerDoc(currentNow);
-      await setDoc(docRef, fresh);
-      setMagic(0);
-      setInventory({ elf: 0, reindeer: 0, maverick: 0, lexus: 0 });
-      setGlovesLevel(0);
-      setBells(0);
-      setCasinoLastSpin(0);
-      setUnderfunded(false);
-      setStats({ taps: 0, totalMagicEarned: 0, actionsUsed: 0, achievements: [] });
       setOfflineSummary(null);
     }
 
+    await updateDoc(doc(db, "factory", selectedPlayer), {
+      magic: finalMagic,
+      totalMagicEarned: updatedTotal,
+      underfunded: isLow,
+      lastUpdate: currentNow
+    });
+
+    await evaluateAchievements(nextStats, savedInv, savedBells);
     setGameState('playing');
+  };
+
+  // Wybór konta -> ustawienie lub wpisanie hasła tego konta
+  const handleSelectPlayer = async (selectedPlayer) => {
+    setPlayer(selectedPlayer);
+    setPinInput('');
+    setPinConfirm('');
+    setAuthError('');
+    setGameState('loading');
+
+    const currentNow = Date.now();
+    const docRef = doc(db, "factory", selectedPlayer);
+    const docSnap = await getDoc(docRef);
+
+    let data = createFreshPlayerDoc(currentNow);
+    if (docSnap.exists()) {
+      data = { ...data, ...docSnap.data() };
+    } else {
+      await setDoc(docRef, data);
+    }
+
+    if (data.pin && String(data.pin).length > 0) {
+      setGameState('auth_login');
+    } else {
+      setGameState('auth_setup');
+    }
+  };
+
+  const handleSetAccountPin = async () => {
+    const cleanPin = pinInput.trim();
+    const cleanConfirm = pinConfirm.trim();
+    if (cleanPin.length < 4) {
+      setAuthError('Hasło musi mieć co najmniej 4 znaki.');
+      return;
+    }
+    if (cleanPin !== cleanConfirm) {
+      setAuthError('Hasła nie są identyczne.');
+      return;
+    }
+
+    setAuthError('');
+    setGameState('loading');
+    const currentNow = Date.now();
+    const docRef = doc(db, "factory", player);
+    const docSnap = await getDoc(docRef);
+    const existing = docSnap.exists() ? docSnap.data() : createFreshPlayerDoc(currentNow);
+
+    await setDoc(docRef, { ...existing, pin: cleanPin, lastUpdate: currentNow }, { merge: true });
+    setPinInput('');
+    setPinConfirm('');
+    await loadPlayerSession(player, { ...existing, pin: cleanPin }, currentNow);
+  };
+
+  const handleLoginAccountPin = async () => {
+    setGameState('loading');
+    const currentNow = Date.now();
+    const docRef = doc(db, "factory", player);
+    const docSnap = await getDoc(docRef);
+    const existing = docSnap.exists() ? docSnap.data() : createFreshPlayerDoc(currentNow);
+
+    if (pinInput === existing.pin) {
+      setAuthError('');
+      setPinInput('');
+      await loadPlayerSession(player, existing, currentNow);
+    } else {
+      setPinInput('');
+      setAuthError('Nieprawidłowe hasło do konta!');
+      setGameState('auth_login');
+    }
+  };
+
+  const handleLogoutToMenu = () => {
+    setGameState('menu');
+    setPlayer(null);
+    setPinInput('');
+    setPinConfirm('');
+    setAuthError('');
   };
 
   // Produkcja pasywna co sekundę
@@ -351,7 +419,7 @@ export default function Game() {
     return () => clearInterval(saveTimer);
   }, [gameState, player]);
 
-  // Złoty Renifer (rzadszy i krótsze okno na złapanie)
+  // Złoty Renifer
   useEffect(() => {
     if (gameState !== 'playing') {
       setGoldenReindeer(null);
@@ -706,13 +774,100 @@ export default function Game() {
 
       <div className="z-10 w-full max-w-lg flex flex-col items-center pt-4 pb-24">
 
+        {gameState === 'loading' && (
+          <div className="mt-24 text-amber-300 font-bold animate-pulse text-lg">
+            Łączenie z kontem...
+          </div>
+        )}
+
+        {/* USTAWIENIE HASŁA DLA KONTA */}
+        {gameState === 'auth_setup' && (
+          <div className="w-full bg-black/60 backdrop-blur-xl border border-amber-400/40 rounded-3xl p-7 mt-12 text-center shadow-2xl">
+            <span className="text-5xl mb-3 block">🔐</span>
+            <h2 className="text-2xl font-bold text-amber-300 uppercase tracking-wider mb-1">
+              Konto: {player?.toUpperCase()}
+            </h2>
+            <p className="text-xs text-slate-300 mb-6">
+              To konto nie ma jeszcze hasła. Ustaw własne hasło (min. 4 znaki), aby chronić swój postęp.
+            </p>
+
+            <input
+              type="password"
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value)}
+              className="w-full bg-slate-900 border border-white/20 text-white text-center rounded-xl p-3.5 mb-3 text-lg tracking-widest focus:outline-none focus:border-amber-400"
+              placeholder="Nowe hasło"
+            />
+            <input
+              type="password"
+              value={pinConfirm}
+              onChange={(e) => setPinConfirm(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSetAccountPin()}
+              className="w-full bg-slate-900 border border-white/20 text-white text-center rounded-xl p-3.5 mb-4 text-lg tracking-widest focus:outline-none focus:border-amber-400"
+              placeholder="Powtórz hasło"
+            />
+
+            {authError && <p className="text-red-400 text-xs font-bold mb-4">{authError}</p>}
+
+            <button
+              onClick={handleSetAccountPin}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl border border-emerald-400/50 transition-all mb-3"
+            >
+              Zapisz hasło i wejdź
+            </button>
+            <button
+              onClick={handleLogoutToMenu}
+              className="w-full bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-bold uppercase py-3 rounded-xl border border-white/10"
+            >
+              Wróć do wyboru konta
+            </button>
+          </div>
+        )}
+
+        {/* LOGOWANIE HASŁEM DO KONTA */}
+        {gameState === 'auth_login' && (
+          <div className="w-full bg-black/60 backdrop-blur-xl border border-amber-400/40 rounded-3xl p-7 mt-12 text-center shadow-2xl">
+            <span className="text-5xl mb-3 block">🔑</span>
+            <h2 className="text-2xl font-bold text-amber-300 uppercase tracking-wider mb-1">
+              Logowanie: {player?.toUpperCase()}
+            </h2>
+            <p className="text-xs text-slate-300 mb-6">
+              Podaj hasło przypisane do konta {player?.toUpperCase()}.
+            </p>
+
+            <input
+              type="password"
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleLoginAccountPin()}
+              className="w-full bg-slate-900 border border-white/20 text-white text-center rounded-xl p-3.5 mb-4 text-lg tracking-widest focus:outline-none focus:border-amber-400"
+              placeholder="Hasło konta"
+            />
+
+            {authError && <p className="text-red-400 text-xs font-bold mb-4">{authError}</p>}
+
+            <button
+              onClick={handleLoginAccountPin}
+              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3.5 rounded-xl border border-blue-400/50 transition-all mb-3"
+            >
+              Zaloguj się
+            </button>
+            <button
+              onClick={handleLogoutToMenu}
+              className="w-full bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-bold uppercase py-3 rounded-xl border border-white/10"
+            >
+              Wróć do wyboru konta
+            </button>
+          </div>
+        )}
+
         {gameState === 'menu' && (
           <div className="w-full flex flex-col items-center animate-fade-in mt-4">
             <h1 className="text-4xl md:text-5xl text-transparent bg-clip-text bg-gradient-to-b from-amber-200 to-amber-400 font-extrabold mb-2 font-serif text-center drop-shadow-md">
               Fabryka Mikołaja 🏭
             </h1>
             <p className="text-red-300/80 mb-6 italic text-xs md:text-sm text-center">
-              Tryb Hardcore: koszty utrzymania floty, drogie ulepszenia i bezlitosne kasyno.
+              Wyzerowane statystyki, własne hasło do konta i tryb Hardcore.
             </p>
 
             {/* PASEK PRZEWAGI */}
@@ -739,7 +894,7 @@ export default function Game() {
                   <div>
                     <span className="font-bold text-white uppercase tracking-wider text-lg block">Stary</span>
                     <span className="text-[11px] text-slate-300">
-                      🔔 {leaderboard.stary?.bells || 0} • Medale: {(leaderboard.stary?.achievements || []).length}/{ACHIEVEMENTS.length}
+                      {leaderboard.stary?.pin ? '🔒 Hasło ustawione' : '🔓 Brak hasła'} • 🔔 {leaderboard.stary?.bells || 0} • Medale: {(leaderboard.stary?.achievements || []).length}/{ACHIEVEMENTS.length}
                       {leaderboard.stary?.underfunded && <span className="ml-2 text-red-400 font-bold">⚠️ Deficyt</span>}
                       {leaderboard.stary?.frozenUntil > now && <span className="ml-2 text-cyan-300 font-bold">❄️ Zamrożony</span>}
                       {leaderboard.stary?.boostUntil > now && <span className="ml-2 text-amber-300 font-bold">☕ x2</span>}
@@ -752,7 +907,7 @@ export default function Game() {
                   <div>
                     <span className="font-bold text-white uppercase tracking-wider text-lg block">Stara</span>
                     <span className="text-[11px] text-slate-300">
-                      🔔 {leaderboard.stara?.bells || 0} • Medale: {(leaderboard.stara?.achievements || []).length}/{ACHIEVEMENTS.length}
+                      {leaderboard.stara?.pin ? '🔒 Hasło ustawione' : '🔓 Brak hasła'} • 🔔 {leaderboard.stara?.bells || 0} • Medale: {(leaderboard.stara?.achievements || []).length}/{ACHIEVEMENTS.length}
                       {leaderboard.stara?.underfunded && <span className="ml-2 text-red-400 font-bold">⚠️ Deficyt</span>}
                       {leaderboard.stara?.frozenUntil > now && <span className="ml-2 text-cyan-300 font-bold">❄️ Zamrożona</span>}
                       {leaderboard.stara?.boostUntil > now && <span className="ml-2 text-amber-300 font-bold">☕ x2</span>}
@@ -792,10 +947,10 @@ export default function Game() {
               </div>
             </div>
 
-            <h3 className="text-white font-bold mb-4 uppercase tracking-widest text-sm">Wybierz swoją fabrykę:</h3>
+            <h3 className="text-white font-bold mb-4 uppercase tracking-widest text-sm">Wybierz swoje konto:</h3>
             <div className="flex gap-4 w-full">
-              <button onClick={() => handleStart('stary')} className="flex-1 bg-gradient-to-b from-blue-600 to-blue-800 hover:from-blue-500 text-white font-bold py-5 rounded-2xl border border-blue-400/50 shadow-[0_10px_20px_rgba(37,99,235,0.3)] transition-all text-xl uppercase">Stary</button>
-              <button onClick={() => handleStart('stara')} className="flex-1 bg-gradient-to-b from-pink-600 to-pink-800 hover:from-pink-500 text-white font-bold py-5 rounded-2xl border border-pink-400/50 shadow-[0_10px_20px_rgba(219,39,119,0.3)] transition-all text-xl uppercase">Stara</button>
+              <button onClick={() => handleSelectPlayer('stary')} className="flex-1 bg-gradient-to-b from-blue-600 to-blue-800 hover:from-blue-500 text-white font-bold py-5 rounded-2xl border border-blue-400/50 shadow-[0_10px_20px_rgba(37,99,235,0.3)] transition-all text-xl uppercase">Stary</button>
+              <button onClick={() => handleSelectPlayer('stara')} className="flex-1 bg-gradient-to-b from-pink-600 to-pink-800 hover:from-pink-500 text-white font-bold py-5 rounded-2xl border border-pink-400/50 shadow-[0_10px_20px_rgba(219,39,119,0.3)] transition-all text-xl uppercase">Stara</button>
             </div>
 
             <Link to="/" className="mt-10 text-white/50 hover:text-white text-sm uppercase tracking-widest transition-colors border-b border-white/20 pb-1">Wróć do Kalendarza</Link>
@@ -1012,7 +1167,7 @@ export default function Game() {
             </div>
 
             <div className="mt-2 flex gap-4 w-full">
-              <button onClick={() => setGameState('menu')} className="flex-1 bg-white/10 text-white/70 hover:text-white hover:bg-white/20 text-xs font-bold uppercase py-4 rounded-xl border border-white/10 transition-colors">Wróć do Menu</button>
+              <button onClick={handleLogoutToMenu} className="flex-1 bg-white/10 text-white/70 hover:text-white hover:bg-white/20 text-xs font-bold uppercase py-4 rounded-xl border border-white/10 transition-colors">Zmień konto</button>
               <Link to="/" className="flex-1 bg-red-900/30 text-red-300 hover:text-red-200 text-xs font-bold uppercase py-4 rounded-xl border border-red-500/30 transition-colors flex justify-center items-center">Wyjście</Link>
             </div>
 
