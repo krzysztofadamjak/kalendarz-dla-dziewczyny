@@ -127,7 +127,6 @@ export default function Admin() {
     }
   };
 
-  // Sortowanie kluczy do podglądu, żeby leciały po kolei (1, 2, 3...)
   const sortedKeys = Object.keys(allVouchers).sort((a, b) => parseInt(a) - parseInt(b));
   const activeVouchers = sortedKeys.filter(d => allVouchers[d].drawnVoucher && allVouchers[d].timeScratched);
 
@@ -168,24 +167,37 @@ export default function Admin() {
           <Link to="/" className="block mt-8 text-sm text-slate-500 underline">Wróć do kalendarza</Link>
         </div>
         
-        {/* STATUS */}
+        {/* STATUS PROJEKTU - POPRAWIONY! */}
         <div className="bg-slate-800 p-6 md:p-8 rounded-xl shadow-xl border border-slate-700">
           <h2 className="text-2xl font-bold text-amber-400 mb-6">Status Projektu</h2>
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-4 gap-3">
             {sortedKeys.map((d) => {
               const data = allVouchers[d];
+              const hasPhoto = !!data?.photoUrl;
+              const hasQuestion = !!data?.question; // Sprawdzamy czy jest ustawiona zagadka
+
               return (
                 <div key={d} className={`p-2 rounded border flex flex-col items-center justify-center text-center ${data?.isCompleted ? 'bg-emerald-900/30 border-emerald-600' : 'bg-slate-700 border-slate-600'}`}>
                   <div className="font-bold text-white text-sm">Dzień {d}</div>
-                  <div className="text-[10px] text-slate-400">{data?.photoUrl ? '📸 Foto' : ''}</div>
-                  <div className="flex gap-1 mt-1 text-xs">{data?.isCompleted && <span>✅</span>}{data?.reaction && <span>{data.reaction}</span>}</div>
+                  
+                  {/* Tutaj wracają ikony! */}
+                  <div className="flex flex-col gap-0.5 mt-1">
+                    {hasPhoto && <span className="text-[10px] text-emerald-400">📸 Foto</span>}
+                    {hasQuestion && <span className="text-[10px] text-indigo-400">🕵️‍♂️ Pytanie</span>}
+                    {!hasPhoto && !hasQuestion && <span className="text-[10px] text-slate-500 opacity-0">.</span>}
+                  </div>
+
+                  <div className="flex gap-1 mt-1 text-xs items-center justify-center min-h-[20px]">
+                    {data?.isCompleted && <span>✅</span>}
+                    {data?.reaction && <span className="text-sm">{data.reaction}</span>}
+                  </div>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* 🔥 NOWOŚĆ: ZARZĄDZANIE JEJ PORTFELEM 🔥 */}
+        {/* ZARZĄDZANIE PORTFELEM */}
         <div className="bg-slate-800 p-6 md:p-8 rounded-xl shadow-xl border border-emerald-700/50 lg:col-span-2">
           <h2 className="text-2xl font-bold text-emerald-400 mb-2 flex items-center gap-3">
             <span>🪪</span> Zarządzanie Jej Portfelem (Zdalne)
@@ -222,10 +234,10 @@ export default function Admin() {
                     
                     <div className="flex gap-2">
                       <button onClick={() => handleAdd24h(d, data.timeScratched)} className="flex-1 bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs font-bold py-2 px-1 rounded transition-colors border border-emerald-500 whitespace-nowrap">
-                        ⏳ +24h Ważności
+                        ⏳ +24h
                       </button>
                       <button onClick={() => handleResetVoucher(d)} className="flex-1 bg-red-600/80 hover:bg-red-500 text-white text-xs font-bold py-2 px-1 rounded transition-colors border border-red-500 whitespace-nowrap">
-                        🗑️ Resetuj Dzień
+                        🗑️ Reset
                       </button>
                     </div>
                   </div>
