@@ -170,15 +170,18 @@ export default function Home() {
           </p>
         </div>
         
-        {/* PRZYCISK PORTFELA */}
+        {/* PRZYCISKI AKCJI */}
         <div className="mt-6 flex flex-col gap-4 items-center w-full">
           <Link to="/portfel" state={{ isTest: false }} className="w-full max-w-md group bg-gradient-to-r from-emerald-600/30 to-emerald-800/30 hover:from-emerald-500/40 hover:to-emerald-700/40 border border-emerald-500/50 text-emerald-300 px-8 py-4 rounded-full font-bold text-lg tracking-wide transition-all transform hover:scale-105 flex items-center justify-center gap-4 shadow-[0_0_20px_rgba(16,185,129,0.2)] backdrop-blur-md">
             <span className="text-2xl group-hover:scale-110 transition-transform">🪪</span> Otwórz Portfel Kuponów
           </Link>
           
-          {/* PRZYCISK GRY Z DODANYM EFEKTEM */}
           <Link to="/gra" className="w-full max-w-md group bg-gradient-to-r from-blue-600/30 to-purple-800/30 hover:from-blue-500/40 hover:to-purple-700/40 border border-blue-500/50 text-blue-300 px-8 py-4 rounded-full font-bold text-lg tracking-wide transition-all transform hover:scale-105 flex items-center justify-center gap-4 shadow-[0_0_20px_rgba(59,130,246,0.2)] backdrop-blur-md">
             <span className="text-2xl group-hover:scale-110 group-hover:rotate-12 transition-transform">🕹️</span> Zagrajmy w Grę!
+          </Link>
+
+          <Link to="/zdrapki" className="w-full max-w-md group bg-gradient-to-r from-amber-600/30 to-emerald-800/30 hover:from-amber-500/40 hover:to-emerald-700/40 border border-amber-400/50 text-amber-200 px-8 py-4 rounded-full font-bold text-lg tracking-wide transition-all transform hover:scale-105 flex items-center justify-center gap-4 shadow-[0_0_20px_rgba(251,191,36,0.2)] backdrop-blur-md">
+            <span className="text-2xl group-hover:scale-110 transition-transform">🎟️</span> Zdrapki Lotto!
           </Link>
         </div>
 
