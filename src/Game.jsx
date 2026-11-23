@@ -9,22 +9,86 @@ import { useWindowSize } from 'react-use';
 const RESET_FLAG_KEY = 'factory_hard_reset_v4_2026';
 
 const UPGRADES = {
-  elf: { id: 'elf', name: 'Scenic', baseCost: 60, cps: 1, upkeepPerMin: 1, icon: '🚐', desc: '+1 Magia/s • Utrzymanie: 1/min' },
-  reindeer: { id: 'reindeer', name: 'Meganka', baseCost: 900, cps: 10, upkeepPerMin: 14, icon: '🚗', desc: '+10 Magii/s • Utrzymanie: 14/min' },
-  maverick: { id: 'maverick', name: 'Maverick w LPG', baseCost: 7500, cps: 60, upkeepPerMin: 95, icon: '🛻', desc: '+60 Magii/s • Utrzymanie: 95/min' },
-  lexus: { id: 'lexus', name: 'Lexus Hybryda', baseCost: 55000, cps: 280, upkeepPerMin: 480, icon: '🏎️', desc: '+280 Magii/s • Utrzymanie: 480/min' }
+  elf: {
+    id: 'elf',
+    name: 'Scenic',
+    baseCost: 60,
+    cps: 1,
+    upkeepPerMin: 1,
+    repairCost: 120,
+    faultLabel: 'Usterka elektroniki w Scenicu',
+    icon: '🚐',
+    desc: '+1 Magia/s • Utrzymanie: 1/min'
+  },
+  reindeer: {
+    id: 'reindeer',
+    name: 'Meganka',
+    baseCost: 900,
+    cps: 10,
+    upkeepPerMin: 14,
+    repairCost: 1400,
+    faultLabel: 'Wyciek w Megance',
+    icon: '🚗',
+    desc: '+10 Magii/s • Utrzymanie: 14/min'
+  },
+  maverick: {
+    id: 'maverick',
+    name: 'Maverick w LPG',
+    baseCost: 7500,
+    cps: 60,
+    upkeepPerMin: 95,
+    repairCost: 9500,
+    faultLabel: 'Zatkany katalizator w Mavericku',
+    icon: '🛻',
+    desc: '+60 Magii/s • Utrzymanie: 95/min'
+  },
+  lexus: {
+    id: 'lexus',
+    name: 'Lexus Hybryda',
+    baseCost: 55000,
+    cps: 280,
+    upkeepPerMin: 480,
+    repairCost: 58000,
+    faultLabel: 'Błąd falownika hybrydy w Lexusie',
+    icon: '🏎️',
+    desc: '+280 Magii/s • Utrzymanie: 480/min'
+  }
 };
 
 const GLOVES_BASE_COST = 500;
 const CASINO_COST = 3500;
 const CASINO_COOLDOWN_MS = 3 * 60 * 60 * 1000;
 const PRESTIGE_THRESHOLD = 180000;
+const SHIELD_COST = 4500;
+const SHIELD_DURATION_MS = 20 * 60 * 1000;
+const RECON_COST = 1800;
 
 const QUEST_TEMPLATES = [
   { id: 'taps_400', title: 'Odmrażanie palców', target: 400, reward: 900, field: 'sessionTaps' },
   { id: 'buys_4', title: 'Kosmiczny serwis', target: 4, reward: 2200, field: 'sessionBuys' },
   { id: 'spins_2', title: 'Stały bywalec Kasyna', target: 2, reward: 3200, field: 'sessionSpins' },
   { id: 'taps_1000', title: 'Żelazny nadgarstek', target: 1000, reward: 3800, field: 'sessionTaps' }
+];
+
+const HARDCORE_CONTRACTS = [
+  {
+    id: 'sprint_900',
+    title: 'Szybki rozruch',
+    desc: 'Nabij 900 kliknięć w 8 minut.',
+    durationMs: 8 * 60 * 1000,
+    targetTaps: 900,
+    rewardMagic: 8500,
+    penaltyMagic: 3500
+  },
+  {
+    id: 'marathon_1800',
+    title: 'Maraton na mrozie',
+    desc: 'Nabij 1800 kliknięć w 15 minut.',
+    durationMs: 15 * 60 * 1000,
+    targetTaps: 1800,
+    rewardMagic: 18000,
+    penaltyMagic: 7500
+  }
 ];
 
 const ACHIEVEMENTS = [
@@ -37,6 +101,8 @@ const ACHIEVEMENTS = [
   { id: 'prestige_2', name: 'Podwójny Dzwonek', icon: '🔔', desc: 'Zdobądź łącznie 2 Złote Dzwonki.', check: (s) => (s.bells || 0) >= 2 }
 ];
 
+const emptyFaults = () => ({ elf: false, reindeer: false, maverick: false, lexus: false });
+
 const createFreshPlayerDoc = (ts = Date.now()) => ({
   pin: '',
   magic: 0,
@@ -44,6 +110,7 @@ const createFreshPlayerDoc = (ts = Date.now()) => ({
   reindeer: 0,
   maverick: 0,
   lexus: 0,
+  faults: emptyFaults(),
   glovesLevel: 0,
   bells: 0,
   taps: 0,
@@ -53,6 +120,8 @@ const createFreshPlayerDoc = (ts = Date.now()) => ({
   achievements: [],
   frozenUntil: 0,
   boostUntil: 0,
+  icedUntil: 0,
+  shieldUntil: 0,
   underfunded: false,
   lastUpdate: ts
 });
@@ -60,25 +129,28 @@ const createFreshPlayerDoc = (ts = Date.now()) => ({
 export default function Game() {
   const { width, height } = useWindowSize();
 
-  // STANY: 'menu', 'auth_setup', 'auth_login', 'loading', 'playing'
   const [gameState, setGameState] = useState('menu');
-  const [player, setPlayer] = useState(null); // 'stary' lub 'stara'
+  const [player, setPlayer] = useState(null);
 
-  // HASŁO KONTA GRACZA
   const [pinInput, setPinInput] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
   const [authError, setAuthError] = useState('');
 
   const [magic, setMagic] = useState(0);
   const [inventory, setInventory] = useState({ elf: 0, reindeer: 0, maverick: 0, lexus: 0 });
+  const [faults, setFaults] = useState(emptyFaults());
   const [glovesLevel, setGlovesLevel] = useState(0);
   const [bells, setBells] = useState(0);
   const [casinoLastSpin, setCasinoLastSpin] = useState(0);
+  const [shieldUntil, setShieldUntil] = useState(0);
   const [underfunded, setUnderfunded] = useState(false);
   const [stats, setStats] = useState({ taps: 0, totalMagicEarned: 0, actionsUsed: 0, achievements: [] });
 
   const [questIndex, setQuestIndex] = useState(0);
   const [questProgress, setQuestProgress] = useState({ sessionTaps: 0, sessionBuys: 0, sessionSpins: 0 });
+
+  const [activeContract, setActiveContract] = useState(null);
+  const [reconReport, setReconReport] = useState(null);
 
   const [leaderboard, setLeaderboard] = useState({
     stary: createFreshPlayerDoc(0),
@@ -92,17 +164,16 @@ export default function Game() {
   const [celebrateMedal, setCelebrateMedal] = useState(null);
   const [now, setNow] = useState(Date.now());
 
-  const stateRef = useRef({ magic, inventory, glovesLevel, bells, casinoLastSpin, underfunded, stats, player });
+  const stateRef = useRef({ magic, inventory, faults, glovesLevel, bells, casinoLastSpin, shieldUntil, underfunded, stats, player });
   useEffect(() => {
-    stateRef.current = { magic, inventory, glovesLevel, bells, casinoLastSpin, underfunded, stats, player };
-  }, [magic, inventory, glovesLevel, bells, casinoLastSpin, underfunded, stats, player]);
+    stateRef.current = { magic, inventory, faults, glovesLevel, bells, casinoLastSpin, shieldUntil, underfunded, stats, player };
+  }, [magic, inventory, faults, glovesLevel, bells, casinoLastSpin, shieldUntil, underfunded, stats, player]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  // Natychmiastowy twardy reset statystyk i haseł graczy w bazie
   useEffect(() => {
     let active = true;
     let unsub = null;
@@ -127,7 +198,12 @@ export default function Game() {
           stara: createFreshPlayerDoc(0)
         };
         snapshot.forEach(d => {
-          lb[d.id] = { ...lb[d.id], ...d.data() };
+          const data = d.data();
+          lb[d.id] = {
+            ...lb[d.id],
+            ...data,
+            faults: { ...emptyFaults(), ...(data.faults || {}) }
+          };
         });
         setLeaderboard(lb);
       });
@@ -144,6 +220,8 @@ export default function Game() {
   const myData = player ? leaderboard[player] : null;
   const isFrozen = !!(myData && myData.frozenUntil && myData.frozenUntil > now);
   const hasChocolateBoost = !!(myData && myData.boostUntil && myData.boostUntil > now);
+  const isIced = !!(myData && myData.icedUntil && myData.icedUntil > now);
+  const hasShield = shieldUntil > now || !!(myData && myData.shieldUntil && myData.shieldUntil > now);
   const hasFrenzy = frenzyUntil > now;
 
   const getUpkeepPerMin = (inv = inventory) => {
@@ -153,11 +231,11 @@ export default function Game() {
            (inv.lexus * UPGRADES.lexus.upkeepPerMin);
   };
 
-  const getBaseCPS = (inv = inventory, bellCount = bells, isLowFuel = underfunded) => {
-    const raw = (inv.elf * UPGRADES.elf.cps) +
-                (inv.reindeer * UPGRADES.reindeer.cps) +
-                (inv.maverick * UPGRADES.maverick.cps) +
-                (inv.lexus * UPGRADES.lexus.cps);
+  const getBaseCPS = (inv = inventory, flt = faults, bellCount = bells, isLowFuel = underfunded) => {
+    const raw = (!flt.elf ? inv.elf * UPGRADES.elf.cps : 0) +
+                (!flt.reindeer ? inv.reindeer * UPGRADES.reindeer.cps : 0) +
+                (!flt.maverick ? inv.maverick * UPGRADES.maverick.cps : 0) +
+                (!flt.lexus ? inv.lexus * UPGRADES.lexus.cps : 0);
     const prestigeMult = 1 + (bellCount * 0.08);
     const fuelMult = isLowFuel ? 0.5 : 1;
     return Math.floor(raw * prestigeMult * fuelMult);
@@ -172,6 +250,7 @@ export default function Game() {
   };
 
   const getTapPower = () => {
+    if (isIced) return 1;
     const baseCps = getBaseCPS();
     const passiveBonus = Math.floor(baseCps * 0.008 * glovesLevel);
     const power = Math.floor((1 + (glovesLevel * 1.1) + passiveBonus) * (1 + (bells * 0.08)));
@@ -186,6 +265,41 @@ export default function Game() {
     setActionToast(msg);
     setTimeout(() => setActionToast(''), 4200);
   };
+
+  // Kontrola wygaśnięcia Kontraktu Hardcore
+  useEffect(() => {
+    if (!activeContract || gameState !== 'playing') return;
+    if (now >= activeContract.expiresAt) {
+      const penalty = Math.min(stateRef.current.magic, activeContract.penaltyMagic);
+      const nextMagic = Math.max(0, stateRef.current.magic - penalty);
+      setMagic(nextMagic);
+      setActiveContract(null);
+      showToast(`Kontrakt "${activeContract.title}" nieudany! Kara: -${penalty} ✨`);
+      if (player) {
+        updateDoc(doc(db, "factory", player), { magic: nextMagic, lastUpdate: Date.now() }).catch(() => {});
+      }
+    }
+  }, [now, activeContract, gameState, player]);
+
+  // Losowa awaria pojazdu w trakcie gry
+  useEffect(() => {
+    if (gameState !== 'playing' || !player) return;
+    const faultTimer = setInterval(async () => {
+      const snap = stateRef.current;
+      const ownedIds = Object.keys(UPGRADES).filter(k => (snap.inventory[k] || 0) > 0 && !snap.faults[k]);
+      if (ownedIds.length === 0) return;
+      if (Math.random() < 0.28) {
+        const chosen = ownedIds[Math.floor(Math.random() * ownedIds.length)];
+        const nextFaults = { ...snap.faults, [chosen]: true };
+        setFaults(nextFaults);
+        showToast(`Awaria! ${UPGRADES[chosen].faultLabel} – brak produkcji z tego typu do naprawy!`);
+        try {
+          await updateDoc(doc(db, "factory", snap.player), { faults: nextFaults });
+        } catch (e) {}
+      }
+    }, 55000);
+    return () => clearInterval(faultTimer);
+  }, [gameState, player]);
 
   const evaluateAchievements = async (candidateStats, currentInv, currentBells = bells) => {
     const ctx = { ...candidateStats, ...currentInv, bells: currentBells };
@@ -223,9 +337,11 @@ export default function Game() {
       maverick: d.maverick || 0,
       lexus: d.lexus || 0
     };
+    const savedFaults = { ...emptyFaults(), ...(d.faults || {}) };
     const savedGloves = d.glovesLevel || 0;
     const savedBells = d.bells || 0;
     const savedSpin = d.casinoLastSpin || 0;
+    const savedShield = d.shieldUntil || 0;
     const savedStats = {
       taps: d.taps || 0,
       totalMagicEarned: d.totalMagicEarned || d.magic || 0,
@@ -234,9 +350,11 @@ export default function Game() {
     };
 
     setInventory(savedInv);
+    setFaults(savedFaults);
     setGlovesLevel(savedGloves);
     setBells(savedBells);
     setCasinoLastSpin(savedSpin);
+    setShieldUntil(savedShield);
     setStats(savedStats);
 
     const lastTs = d.lastUpdate || currentNow;
@@ -248,10 +366,10 @@ export default function Game() {
     const upkeepPerMin = getUpkeepPerMin(savedInv);
     const totalUpkeep = elapsedMinutes * upkeepPerMin;
 
-    const rawCps = (savedInv.elf * UPGRADES.elf.cps) +
-                   (savedInv.reindeer * UPGRADES.reindeer.cps) +
-                   (savedInv.maverick * UPGRADES.maverick.cps) +
-                   (savedInv.lexus * UPGRADES.lexus.cps);
+    const rawCps = (!savedFaults.elf ? savedInv.elf * UPGRADES.elf.cps : 0) +
+                   (!savedFaults.reindeer ? savedInv.reindeer * UPGRADES.reindeer.cps : 0) +
+                   (!savedFaults.maverick ? savedInv.maverick * UPGRADES.maverick.cps : 0) +
+                   (!savedFaults.lexus ? savedInv.lexus * UPGRADES.lexus.cps : 0);
     const prestigeMult = 1 + (savedBells * 0.08);
     const mult = (d.boostUntil && d.boostUntil > currentNow) ? 2 : 1;
     const grossEarned = wasFrozen ? 0 : Math.floor(diffSeconds * rawCps * prestigeMult * mult);
@@ -286,12 +404,12 @@ export default function Game() {
     setGameState('playing');
   };
 
-  // Wybór konta -> ustawienie lub wpisanie hasła tego konta
   const handleSelectPlayer = async (selectedPlayer) => {
     setPlayer(selectedPlayer);
     setPinInput('');
     setPinConfirm('');
     setAuthError('');
+    setReconReport(null);
     setGameState('loading');
 
     const currentNow = Date.now();
@@ -358,12 +476,13 @@ export default function Game() {
   const handleLogoutToMenu = () => {
     setGameState('menu');
     setPlayer(null);
+    setActiveContract(null);
+    setReconReport(null);
     setPinInput('');
     setPinConfirm('');
     setAuthError('');
   };
 
-  // Produkcja pasywna co sekundę
   useEffect(() => {
     if (gameState !== 'playing') return;
     const timer = setInterval(() => {
@@ -378,9 +497,8 @@ export default function Game() {
       }
     }, 1000);
     return () => clearInterval(timer);
-  }, [gameState, inventory, bells, underfunded, isFrozen, hasChocolateBoost, hasFrenzy]);
+  }, [gameState, inventory, faults, bells, underfunded, isFrozen, hasChocolateBoost, hasFrenzy]);
 
-  // Koszt utrzymania co 60 sekund w trakcie gry
   useEffect(() => {
     if (gameState !== 'playing' || !player) return;
     const upkeepTimer = setInterval(async () => {
@@ -401,7 +519,6 @@ export default function Game() {
     return () => clearInterval(upkeepTimer);
   }, [gameState, player]);
 
-  // Okresowy zapis do chmury
   useEffect(() => {
     if (gameState !== 'playing' || !player) return;
     const saveTimer = setInterval(async () => {
@@ -419,7 +536,6 @@ export default function Game() {
     return () => clearInterval(saveTimer);
   }, [gameState, player]);
 
-  // Złoty Renifer
   useEffect(() => {
     if (gameState !== 'playing') {
       setGoldenReindeer(null);
@@ -512,18 +628,97 @@ export default function Game() {
     if (underfunded && nextMagic >= getUpkeepPerMin()) {
       setUnderfunded(false);
     }
+
+    const nextTapsCount = (stats.taps || 0) + 1;
     const nextStats = {
       ...stats,
-      taps: (stats.taps || 0) + 1,
+      taps: nextTapsCount,
       totalMagicEarned: (stats.totalMagicEarned || 0) + gain
     };
     setStats(nextStats);
 
+    let magicAfterContract = nextMagic;
+    let totalAfterContract = nextStats.totalMagicEarned;
+    if (activeContract) {
+      const doneTaps = nextTapsCount - activeContract.startTaps;
+      if (doneTaps >= activeContract.targetTaps && Date.now() < activeContract.expiresAt) {
+        magicAfterContract = nextMagic + activeContract.rewardMagic;
+        totalAfterContract += activeContract.rewardMagic;
+        setMagic(magicAfterContract);
+        setStats(prev => ({ ...prev, totalMagicEarned: totalAfterContract }));
+        setActiveContract(null);
+        showToast(`Kontrakt "${activeContract.title}" wykonany! +${activeContract.rewardMagic} ✨`);
+      }
+    }
+
     const nextProg = { ...questProgress, sessionTaps: questProgress.sessionTaps + 1 };
     setQuestProgress(nextProg);
 
-    await evaluateAchievements(nextStats, inventory, bells);
-    await advanceQuestIfDone(nextProg, nextMagic);
+    await evaluateAchievements({ ...nextStats, totalMagicEarned: totalAfterContract }, inventory, bells);
+    await advanceQuestIfDone(nextProg, magicAfterContract);
+  };
+
+  const handleStartContract = (contract) => {
+    if (activeContract) return;
+    setActiveContract({
+      ...contract,
+      startTaps: stats.taps || 0,
+      expiresAt: Date.now() + contract.durationMs
+    });
+    showToast(`Przyjęto kontrakt: ${contract.title}!`);
+  };
+
+  const handleRepairFault = async (id) => {
+    const cost = UPGRADES[id].repairCost;
+    if (!faults[id] || magic < cost) return;
+    const nextMagic = magic - cost;
+    const nextFaults = { ...faults, [id]: false };
+    setMagic(nextMagic);
+    setFaults(nextFaults);
+    showToast(`Naprawiono: ${UPGRADES[id].name}!`);
+    try {
+      await updateDoc(doc(db, "factory", player), {
+        magic: nextMagic,
+        faults: nextFaults,
+        lastUpdate: Date.now()
+      });
+    } catch (e) {}
+  };
+
+  const handleBuyShield = async () => {
+    if (magic < SHIELD_COST || hasShield) return;
+    const nextMagic = magic - SHIELD_COST;
+    const nextShieldUntil = Date.now() + SHIELD_DURATION_MS;
+    setMagic(nextMagic);
+    setShieldUntil(nextShieldUntil);
+    showToast("Tarcza Antysabotażowa aktywna przez 20 minut! 🛡️");
+    try {
+      await updateDoc(doc(db, "factory", player), {
+        magic: nextMagic,
+        shieldUntil: nextShieldUntil,
+        lastUpdate: Date.now()
+      });
+    } catch (e) {}
+  };
+
+  const handleBuyRecon = async () => {
+    if (magic < RECON_COST || !opponent) return;
+    const nextMagic = magic - RECON_COST;
+    setMagic(nextMagic);
+    const oppSnap = await getDoc(doc(db, "factory", opponent));
+    const d = oppSnap.exists() ? oppSnap.data() : leaderboard[opponent];
+    setReconReport({
+      target: opponent.toUpperCase(),
+      elf: d.elf || 0,
+      reindeer: d.reindeer || 0,
+      maverick: d.maverick || 0,
+      lexus: d.lexus || 0,
+      bells: d.bells || 0,
+      magic: Math.floor(d.magic || 0)
+    });
+    try {
+      await updateDoc(doc(db, "factory", player), { magic: nextMagic, lastUpdate: Date.now() });
+    } catch (e) {}
   };
 
   const handleBuyUpgrade = async (id) => {
@@ -574,9 +769,21 @@ export default function Game() {
     } catch (e) {}
   };
 
+  // Sabotaż i utrudnienia dla przeciwnika
   const handleSabotage = async (type) => {
-    const cost = type === 'freeze' ? 6500 : 4000;
-    if (magic < cost || !opponent) return;
+    const costs = { freeze: 6500, ice: 5000, breakdown: 5500, tax: 6000, chocolate: 4000 };
+    const cost = costs[type];
+    if (!cost || magic < cost || !opponent) return;
+
+    const oppRef = doc(db, "factory", opponent);
+    const oppSnap = await getDoc(oppRef);
+    const oppData = oppSnap.exists() ? oppSnap.data() : createFreshPlayerDoc(Date.now());
+    const currentNow = Date.now();
+
+    if (type !== 'chocolate' && oppData.shieldUntil && oppData.shieldUntil > currentNow) {
+      showToast(`Tarcza rywala (${opponent.toUpperCase()}) zablokowała sabotaż! 🛡️`);
+      return;
+    }
 
     const nextMagic = magic - cost;
     const nextStats = { ...stats, actionsUsed: (stats.actionsUsed || 0) + 1 };
@@ -587,23 +794,34 @@ export default function Game() {
       await updateDoc(doc(db, "factory", player), {
         magic: nextMagic,
         actionsUsed: nextStats.actionsUsed,
-        lastUpdate: Date.now()
+        lastUpdate: currentNow
       });
 
-      const oppRef = doc(db, "factory", opponent);
-      const oppSnap = await getDoc(oppRef);
-      const currentNow = Date.now();
-
       if (type === 'freeze') {
-        const baseFrozen = oppSnap.exists() && oppSnap.data().frozenUntil > currentNow
-          ? oppSnap.data().frozenUntil
-          : currentNow;
+        const baseFrozen = oppData.frozenUntil > currentNow ? oppData.frozenUntil : currentNow;
         await setDoc(oppRef, { frozenUntil: baseFrozen + (25 * 60 * 1000), lastUpdate: currentNow }, { merge: true });
-        showToast(`Atak Grincha! Fabryka (${opponent.toUpperCase()}) zamrożona na 25 min! 🧌❄️`);
-      } else {
-        const baseBoost = oppSnap.exists() && oppSnap.data().boostUntil > currentNow
-          ? oppSnap.data().boostUntil
-          : currentNow;
+        showToast(`Atak Grincha! Zamrożono produkcję (${opponent.toUpperCase()}) na 25 min! 🧌❄️`);
+      } else if (type === 'ice') {
+        await setDoc(oppRef, { icedUntil: currentNow + (10 * 60 * 1000), lastUpdate: currentNow }, { merge: true });
+        showToast(`Oblodzony Ekran dla (${opponent.toUpperCase()})! Kliknięcia spadają do +1 na 10 min! 🧊`);
+      } else if (type === 'breakdown') {
+        const oppFaults = { ...emptyFaults(), ...(oppData.faults || {}) };
+        const owned = Object.keys(UPGRADES).filter(k => (oppData[k] || 0) > 0 && !oppFaults[k]);
+        if (owned.length > 0) {
+          const targetCar = owned[Math.floor(Math.random() * owned.length)];
+          oppFaults[targetCar] = true;
+          await setDoc(oppRef, { faults: oppFaults, lastUpdate: currentNow }, { merge: true });
+          showToast(`Sabotaż serwisowy! Zepsuto pojazd (${UPGRADES[targetCar].name}) u ${opponent.toUpperCase()}! 🔧`);
+        } else {
+          showToast(`Rywal nie ma sprawnego pojazdu do zepsucia, ale akcja zaliczona.`);
+        }
+      } else if (type === 'tax') {
+        const oppMagic = Math.floor(oppData.magic || 0);
+        const stolen = Math.min(12000, Math.floor(oppMagic * 0.15));
+        await setDoc(oppRef, { magic: Math.max(0, oppMagic - stolen), lastUpdate: currentNow }, { merge: true });
+        showToast(`Podatek Grincha! Rywal (${opponent.toUpperCase()}) traci ${stolen} ✨! 💸`);
+      } else if (type === 'chocolate') {
+        const baseBoost = oppData.boostUntil > currentNow ? oppData.boostUntil : currentNow;
         await setDoc(oppRef, { boostUntil: baseBoost + (30 * 60 * 1000), lastUpdate: currentNow }, { merge: true });
         showToast(`Gorąca Czekolada dla (${opponent.toUpperCase()})! Produkcja x2 przez 30 min! ☕✨`);
       }
@@ -679,11 +897,13 @@ export default function Game() {
 
     const nextBells = bells + earnedBellsPreview;
     const emptyInv = { elf: 0, reindeer: 0, maverick: 0, lexus: 0 };
+    const cleanFaults = emptyFaults();
     const ts = Date.now();
 
     setBells(nextBells);
     setMagic(0);
     setInventory(emptyInv);
+    setFaults(cleanFaults);
     setGlovesLevel(0);
     setUnderfunded(false);
     setFrenzyUntil(0);
@@ -698,9 +918,11 @@ export default function Game() {
         reindeer: 0,
         maverick: 0,
         lexus: 0,
+        faults: cleanFaults,
         glovesLevel: 0,
         bells: nextBells,
         frozenUntil: 0,
+        icedUntil: 0,
         underfunded: false,
         lastUpdate: ts
       });
@@ -735,6 +957,7 @@ export default function Game() {
   const activeQuest = QUEST_TEMPLATES[questIndex];
   const currentQuestVal = questProgress[activeQuest.field] || 0;
   const currentUpkeep = getUpkeepPerMin();
+  const activeFaultIds = Object.keys(UPGRADES).filter(k => faults[k]);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-950 via-slate-900 to-black p-4 flex flex-col items-center relative overflow-hidden font-sans select-none">
@@ -780,7 +1003,6 @@ export default function Game() {
           </div>
         )}
 
-        {/* USTAWIENIE HASŁA DLA KONTA */}
         {gameState === 'auth_setup' && (
           <div className="w-full bg-black/60 backdrop-blur-xl border border-amber-400/40 rounded-3xl p-7 mt-12 text-center shadow-2xl">
             <span className="text-5xl mb-3 block">🔐</span>
@@ -788,7 +1010,7 @@ export default function Game() {
               Konto: {player?.toUpperCase()}
             </h2>
             <p className="text-xs text-slate-300 mb-6">
-              To konto nie ma jeszcze hasła. Ustaw własne hasło (min. 4 znaki), aby chronić swój postęp.
+              To konto nie ma jeszcze hasła. Ustaw własne hasło (min. 4 znaki).
             </p>
 
             <input
@@ -824,7 +1046,6 @@ export default function Game() {
           </div>
         )}
 
-        {/* LOGOWANIE HASŁEM DO KONTA */}
         {gameState === 'auth_login' && (
           <div className="w-full bg-black/60 backdrop-blur-xl border border-amber-400/40 rounded-3xl p-7 mt-12 text-center shadow-2xl">
             <span className="text-5xl mb-3 block">🔑</span>
@@ -867,10 +1088,9 @@ export default function Game() {
               Fabryka Mikołaja 🏭
             </h1>
             <p className="text-red-300/80 mb-6 italic text-xs md:text-sm text-center">
-              Wyzerowane statystyki, własne hasło do konta i tryb Hardcore.
+              Awarie, kontrakty na czas, wywiad, tarcze i bezlitosny sabotaż.
             </p>
 
-            {/* PASEK PRZEWAGI */}
             <div className="bg-black/45 border border-white/10 rounded-2xl p-4 w-full mb-6 backdrop-blur-md">
               <div className="flex justify-between items-center text-xs font-bold mb-2">
                 <span className="text-blue-300">Stary ({staryShare}%)</span>
@@ -883,7 +1103,6 @@ export default function Game() {
               </div>
             </div>
 
-            {/* RANKING */}
             <div className="bg-black/40 border border-amber-500/30 rounded-3xl p-6 w-full mb-7 backdrop-blur-md shadow-[0_0_30px_rgba(251,191,36,0.1)]">
               <h2 className="text-amber-400 font-bold tracking-widest uppercase mb-5 text-sm text-center flex justify-center items-center gap-2">
                 <span>🏆</span> Wyścig Zbrojeń <span>🏆</span>
@@ -894,10 +1113,10 @@ export default function Game() {
                   <div>
                     <span className="font-bold text-white uppercase tracking-wider text-lg block">Stary</span>
                     <span className="text-[11px] text-slate-300">
-                      {leaderboard.stary?.pin ? '🔒 Hasło ustawione' : '🔓 Brak hasła'} • 🔔 {leaderboard.stary?.bells || 0} • Medale: {(leaderboard.stary?.achievements || []).length}/{ACHIEVEMENTS.length}
-                      {leaderboard.stary?.underfunded && <span className="ml-2 text-red-400 font-bold">⚠️ Deficyt</span>}
+                      {leaderboard.stary?.pin ? '🔒 Hasło' : '🔓 Brak'} • 🔔 {leaderboard.stary?.bells || 0} • Medale: {(leaderboard.stary?.achievements || []).length}/{ACHIEVEMENTS.length}
+                      {leaderboard.stary?.shieldUntil > now && <span className="ml-2 text-emerald-300 font-bold">🛡️ Tarcza</span>}
                       {leaderboard.stary?.frozenUntil > now && <span className="ml-2 text-cyan-300 font-bold">❄️ Zamrożony</span>}
-                      {leaderboard.stary?.boostUntil > now && <span className="ml-2 text-amber-300 font-bold">☕ x2</span>}
+                      {leaderboard.stary?.icedUntil > now && <span className="ml-2 text-sky-300 font-bold">🧊 Oblodzony</span>}
                     </span>
                   </div>
                   <span className="text-2xl font-mono text-amber-400 font-bold">{staryMagic} ✨</span>
@@ -907,10 +1126,10 @@ export default function Game() {
                   <div>
                     <span className="font-bold text-white uppercase tracking-wider text-lg block">Stara</span>
                     <span className="text-[11px] text-slate-300">
-                      {leaderboard.stara?.pin ? '🔒 Hasło ustawione' : '🔓 Brak hasła'} • 🔔 {leaderboard.stara?.bells || 0} • Medale: {(leaderboard.stara?.achievements || []).length}/{ACHIEVEMENTS.length}
-                      {leaderboard.stara?.underfunded && <span className="ml-2 text-red-400 font-bold">⚠️ Deficyt</span>}
+                      {leaderboard.stara?.pin ? '🔒 Hasło' : '🔓 Brak'} • 🔔 {leaderboard.stara?.bells || 0} • Medale: {(leaderboard.stara?.achievements || []).length}/{ACHIEVEMENTS.length}
+                      {leaderboard.stara?.shieldUntil > now && <span className="ml-2 text-emerald-300 font-bold">🛡️ Tarcza</span>}
                       {leaderboard.stara?.frozenUntil > now && <span className="ml-2 text-cyan-300 font-bold">❄️ Zamrożona</span>}
-                      {leaderboard.stara?.boostUntil > now && <span className="ml-2 text-amber-300 font-bold">☕ x2</span>}
+                      {leaderboard.stara?.icedUntil > now && <span className="ml-2 text-sky-300 font-bold">🧊 Oblodzona</span>}
                     </span>
                   </div>
                   <span className="text-2xl font-mono text-amber-400 font-bold">{staraMagic} ✨</span>
@@ -918,7 +1137,6 @@ export default function Game() {
               </div>
             </div>
 
-            {/* ŚCIANA CHWAŁY */}
             <div className="bg-black/40 border border-white/10 rounded-3xl p-5 w-full mb-7 backdrop-blur-md">
               <h3 className="text-amber-300 font-bold tracking-widest uppercase mb-4 text-xs text-center">
                 🎖️ Ściana Chwały (Hardcore)
@@ -960,7 +1178,6 @@ export default function Game() {
         {gameState === 'playing' && (
           <div className="w-full flex flex-col items-center animate-fade-in">
 
-            {/* HEADER */}
             <div className="bg-black/60 backdrop-blur-xl border-b border-amber-500/30 w-screen fixed top-0 left-0 px-4 py-3 flex justify-between items-center z-20 shadow-xl">
               <div className="flex flex-col">
                 <span className="text-[10px] text-amber-200/60 uppercase tracking-widest font-bold">
@@ -980,8 +1197,12 @@ export default function Game() {
               </div>
             </div>
 
-            {/* AKTYWNE EFEKTY / OSTRZEŻENIA */}
             <div className="mt-20 w-full flex flex-wrap gap-2 justify-center">
+              {hasShield && (
+                <div className="bg-emerald-950/90 border border-emerald-400 text-emerald-200 px-4 py-2 rounded-full text-xs font-bold">
+                  🛡️ Tarcza aktywna! ({formatTimer(Math.max(shieldUntil, myData?.shieldUntil || 0))})
+                </div>
+              )}
               {underfunded && (
                 <div className="bg-red-950/90 border border-red-500 text-red-200 px-4 py-2 rounded-full text-xs font-bold">
                   ⚠️ Brak paliwa na utrzymanie! Produkcja -50%
@@ -990,6 +1211,11 @@ export default function Game() {
               {isFrozen && (
                 <div className="bg-cyan-950/90 border border-cyan-400 text-cyan-200 px-4 py-2 rounded-full text-xs font-bold">
                   ❄️ Zamrożony! ({formatTimer(myData.frozenUntil)})
+                </div>
+              )}
+              {isIced && (
+                <div className="bg-sky-950/90 border border-sky-400 text-sky-200 px-4 py-2 rounded-full text-xs font-bold">
+                  🧊 Oblodzony Ekran (+1/tap)! ({formatTimer(myData.icedUntil)})
                 </div>
               )}
               {hasChocolateBoost && (
@@ -1004,7 +1230,6 @@ export default function Game() {
               )}
             </div>
 
-            {/* BILANS OFFLINE */}
             {offlineSummary && (
               <div className="bg-slate-900/90 border border-amber-400/60 text-slate-100 p-4 rounded-2xl w-full mt-3 text-center shadow-lg">
                 <p className="font-bold text-xs uppercase tracking-widest mb-1 text-amber-300">Raport Nieobecności</p>
@@ -1012,6 +1237,29 @@ export default function Game() {
                   Wyprodukowano: <strong>+{offlineSummary.earned} ✨</strong> • Koszt utrzymania: <strong className="text-red-300">-{offlineSummary.upkeep} ✨</strong>
                 </p>
                 <button onClick={() => setOfflineSummary(null)} className="mt-3 bg-amber-600 hover:bg-amber-500 text-white text-xs px-6 py-2 rounded-full font-bold">Przyjąłem</button>
+              </div>
+            )}
+
+            {/* AKTYWNE AWARIE DO NAPRAWY */}
+            {activeFaultIds.length > 0 && (
+              <div className="w-full bg-red-950/60 border border-red-500/60 rounded-2xl p-4 mt-3">
+                <h3 className="text-red-300 font-bold uppercase tracking-widest text-xs mb-2">
+                  🛠️ Awarie w Garażu (Zablokowana produkcja)
+                </h3>
+                <div className="flex flex-col gap-2">
+                  {activeFaultIds.map(id => (
+                    <div key={id} className="bg-black/40 border border-red-500/30 rounded-xl p-2.5 flex justify-between items-center">
+                      <span className="text-xs text-red-200 font-medium">{UPGRADES[id].faultLabel}</span>
+                      <button
+                        onClick={() => handleRepairFault(id)}
+                        disabled={magic < UPGRADES[id].repairCost}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${magic >= UPGRADES[id].repairCost ? 'bg-red-600/30 border-red-400 text-white hover:bg-red-600/50' : 'bg-slate-800 border-slate-700 text-slate-500 opacity-50'}`}
+                      >
+                        Napraw ({UPGRADES[id].repairCost} ✨)
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -1025,6 +1273,42 @@ export default function Game() {
               <span className="text-xs font-mono font-bold bg-indigo-500/20 border border-indigo-400/40 text-amber-300 px-3 py-1.5 rounded-xl">
                 +{activeQuest.reward} ✨
               </span>
+            </div>
+
+            {/* KONTRAKTY HARDCORE NA CZAS */}
+            <div className="w-full bg-rose-950/35 border border-rose-500/30 rounded-2xl p-3.5 mt-3">
+              <h3 className="text-rose-300 font-bold uppercase tracking-widest text-xs mb-2">
+                🎯 Kontrakty na Czas (Premia albo Kara)
+              </h3>
+              {activeContract ? (
+                <div className="bg-black/40 border border-rose-400/40 rounded-xl p-3 flex justify-between items-center">
+                  <div>
+                    <p className="text-xs font-bold text-white">{activeContract.title}</p>
+                    <p className="text-[11px] text-slate-300">
+                      Kliknięcia: {Math.max(0, (stats.taps || 0) - activeContract.startTaps)} / {activeContract.targetTaps} • Kara: -{activeContract.penaltyMagic} ✨
+                    </p>
+                  </div>
+                  <span className="text-sm font-mono font-bold text-rose-300">
+                    {formatTimer(activeContract.expiresAt)}
+                  </span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {HARDCORE_CONTRACTS.map(c => (
+                    <button
+                      key={c.id}
+                      onClick={() => handleStartContract(c)}
+                      className="bg-black/40 hover:bg-rose-950/50 border border-white/10 rounded-xl p-2.5 text-left transition-all"
+                    >
+                      <p className="text-xs font-bold text-white">{c.title}</p>
+                      <p className="text-[10px] text-slate-300 my-0.5">{c.desc}</p>
+                      <p className="text-[10px] font-mono text-emerald-300">
+                        +{c.rewardMagic} ✨ / <span className="text-rose-400">-{c.penaltyMagic} ✨</span>
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* GŁÓWNY PRZYCISK (TAP) */}
@@ -1075,13 +1359,16 @@ export default function Game() {
                   const cost = getCost(upg.id);
                   const canAfford = magic >= cost;
                   const count = inventory[upg.id];
+                  const hasFault = !!faults[upg.id];
 
                   return (
-                    <div key={upg.id} className="bg-black/40 border border-white/5 rounded-2xl p-3 flex justify-between items-center">
+                    <div key={upg.id} className={`bg-black/40 border rounded-2xl p-3 flex justify-between items-center ${hasFault ? 'border-red-500/60' : 'border-white/5'}`}>
                       <div className="flex items-center gap-3">
                         <div className="text-4xl bg-white/5 p-2 rounded-xl border border-white/10">{upg.icon}</div>
                         <div className="flex flex-col">
-                          <span className="font-bold text-white">{upg.name}</span>
+                          <span className="font-bold text-white">
+                            {upg.name} {hasFault && <span className="text-xs text-red-400">(AWARIA)</span>}
+                          </span>
                           <span className="text-[10px] text-slate-400">{upg.desc}</span>
                           <span className="text-xs text-emerald-400 font-bold mt-1">Posiadasz: {count} szt.</span>
                         </div>
@@ -1121,10 +1408,50 @@ export default function Game() {
               </button>
             </div>
 
-            {/* SABOTAŻ I WSPARCIE */}
+            {/* OBRONA I WYWIAD */}
+            <div className="w-full bg-slate-900/60 backdrop-blur-md rounded-3xl p-4 border border-emerald-500/20 shadow-xl mb-5">
+              <h3 className="text-emerald-300 font-bold mb-3 uppercase tracking-widest text-xs px-1">
+                🛡️ Obrona i Wywiad
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  onClick={handleBuyShield}
+                  disabled={magic < SHIELD_COST || hasShield}
+                  className={`p-3 rounded-2xl border text-left transition-all ${magic >= SHIELD_COST && !hasShield ? 'bg-emerald-950/50 border-emerald-500/50 hover:bg-emerald-900/50 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-500 opacity-50'}`}
+                >
+                  <div className="font-bold text-sm">🛡️ Tarcza (20 min)</div>
+                  <div className="text-[10px] text-slate-300 my-1">Blokuje ataki sabotażowe rywala.</div>
+                  <div className="text-xs font-mono font-bold text-emerald-300">
+                    {hasShield ? 'AKTYWNA' : `${SHIELD_COST} ✨`}
+                  </div>
+                </button>
+
+                <button
+                  onClick={handleBuyRecon}
+                  disabled={magic < RECON_COST}
+                  className={`p-3 rounded-2xl border text-left transition-all ${magic >= RECON_COST ? 'bg-indigo-950/50 border-indigo-500/50 hover:bg-indigo-900/50 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-500 opacity-50'}`}
+                >
+                  <div className="font-bold text-sm">🕵️ Raport Wywiadu</div>
+                  <div className="text-[10px] text-slate-300 my-1">Podgląd floty i dzwonków ({opponent?.toUpperCase()}).</div>
+                  <div className="text-xs font-mono font-bold text-indigo-300">{RECON_COST} ✨</div>
+                </button>
+              </div>
+
+              {reconReport && (
+                <div className="mt-3 bg-black/50 border border-indigo-400/30 rounded-xl p-3 text-xs text-slate-200">
+                  <p className="font-bold text-indigo-300 mb-1">Wywiad – {reconReport.target}:</p>
+                  <p>Magia: <strong>{reconReport.magic} ✨</strong> • Dzwonki: <strong>🔔 {reconReport.bells}</strong></p>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    🚐 Scenic: {reconReport.elf} • 🚗 Meganka: {reconReport.reindeer} • 🛻 Maverick: {reconReport.maverick} • 🏎️ Lexus: {reconReport.lexus}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* SABOTAŻ I UTRUDNIENIA DLA RYWALA */}
             <div className="w-full bg-slate-900/60 backdrop-blur-md rounded-3xl p-4 border border-purple-500/20 shadow-xl mb-5">
               <h3 className="text-purple-300 font-bold mb-3 uppercase tracking-widest text-xs px-1">
-                ⚔️ Sabotaż i Wsparcie ({opponent?.toUpperCase()})
+                ⚔️ Sabotaż i Utrudnienia ({opponent?.toUpperCase()})
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
@@ -1133,14 +1460,44 @@ export default function Game() {
                   className={`p-3 rounded-2xl border text-left transition-all ${magic >= 6500 ? 'bg-cyan-950/50 border-cyan-500/50 hover:bg-cyan-900/50 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-500 opacity-50'}`}
                 >
                   <div className="font-bold text-sm">🧌 Atak Grincha</div>
-                  <div className="text-[10px] text-slate-300 my-1">Zamraża produkcję przeciwnika na 25 min.</div>
+                  <div className="text-[10px] text-slate-300 my-1">Zamraża produkcję na 25 min.</div>
                   <div className="text-xs font-mono font-bold text-cyan-300">6500 ✨</div>
+                </button>
+
+                <button
+                  onClick={() => handleSabotage('ice')}
+                  disabled={magic < 5000}
+                  className={`p-3 rounded-2xl border text-left transition-all ${magic >= 5000 ? 'bg-sky-950/50 border-sky-500/50 hover:bg-sky-900/50 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-500 opacity-50'}`}
+                >
+                  <div className="font-bold text-sm">🧊 Oblodzony Ekran</div>
+                  <div className="text-[10px] text-slate-300 my-1">Kliknięcia rywala dają tylko +1 przez 10 min.</div>
+                  <div className="text-xs font-mono font-bold text-sky-300">5000 ✨</div>
+                </button>
+
+                <button
+                  onClick={() => handleSabotage('breakdown')}
+                  disabled={magic < 5500}
+                  className={`p-3 rounded-2xl border text-left transition-all ${magic >= 5500 ? 'bg-red-950/50 border-red-500/50 hover:bg-red-900/50 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-500 opacity-50'}`}
+                >
+                  <div className="font-bold text-sm">🔧 Sabotaż Serwisowy</div>
+                  <div className="text-[10px] text-slate-300 my-1">Wywołuje awarię pojazdu u rywala.</div>
+                  <div className="text-xs font-mono font-bold text-red-300">5500 ✨</div>
+                </button>
+
+                <button
+                  onClick={() => handleSabotage('tax')}
+                  disabled={magic < 6000}
+                  className={`p-3 rounded-2xl border text-left transition-all ${magic >= 6000 ? 'bg-fuchsia-950/50 border-fuchsia-500/50 hover:bg-fuchsia-900/50 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-500 opacity-50'}`}
+                >
+                  <div className="font-bold text-sm">💸 Podatek Grincha</div>
+                  <div className="text-[10px] text-slate-300 my-1">Zabiera rywalowi 15% Magii (do 12 000).</div>
+                  <div className="text-xs font-mono font-bold text-fuchsia-300">6000 ✨</div>
                 </button>
 
                 <button
                   onClick={() => handleSabotage('chocolate')}
                   disabled={magic < 4000}
-                  className={`p-3 rounded-2xl border text-left transition-all ${magic >= 4000 ? 'bg-amber-950/50 border-amber-500/50 hover:bg-amber-900/50 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-500 opacity-50'}`}
+                  className={`sm:col-span-2 p-3 rounded-2xl border text-left transition-all ${magic >= 4000 ? 'bg-amber-950/50 border-amber-500/50 hover:bg-amber-900/50 text-white' : 'bg-slate-800/60 border-slate-700 text-slate-500 opacity-50'}`}
                 >
                   <div className="font-bold text-sm">☕ Gorąca Czekolada</div>
                   <div className="text-[10px] text-slate-300 my-1">Daje przeciwnikowi x2 produkcji na 30 min.</div>
@@ -1149,7 +1506,7 @@ export default function Game() {
               </div>
             </div>
 
-            {/* PRESTIŻ (ZŁOTE DZWONKI) */}
+            {/* PRESTIŻ */}
             <div className="w-full bg-slate-900/60 backdrop-blur-md rounded-3xl p-4 border border-yellow-500/30 shadow-xl mb-6">
               <h3 className="text-yellow-300 font-bold mb-1 uppercase tracking-widest text-xs px-1">
                 🔔 Prestiż – Złote Dzwonki
