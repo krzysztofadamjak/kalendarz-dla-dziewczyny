@@ -76,7 +76,6 @@ export default function App() {
 
   const typedQuestion = useTypewriter(trivia?.q || '', 45, startTyping);
 
-  // Sprawdzanie pamięci pod kątem trwającej kary Grincha po załadowaniu
   useEffect(() => {
     const penaltyEndTime = localStorage.getItem(`grinch_penalty_day_${currentDay}`);
     if (penaltyEndTime) {
@@ -90,7 +89,6 @@ export default function App() {
     }
   }, [currentDay]);
 
-  // Logika odliczania kary Grincha
   useEffect(() => {
     let timer;
     if (grinchTimeLeft > 0) {
@@ -123,15 +121,13 @@ export default function App() {
             setTrivia({ q: data.question, A: data.ansA, B: data.ansB, C: data.ansC, correct: data.correctAns || 'A' });
           }
 
-          // JEŚLI JESTEŚMY NA PROD I DANE SĄ W CHMURZE:
           if (!isTestMode) {
             if (data.drawnVoucher) {
               setVoucher(data.drawnVoucher);
               setHasDrawn(true);
               setIsScratched(true);
-              return; // Mamy wszystko z chmury, ignorujemy localStorage!
+              return; 
             } else {
-              // Jeśli w panelu Admina usunięto kupon (zresetowano)
               localStorage.removeItem(`voucher_day_${currentDay}`);
               localStorage.removeItem(`time_scratched_voucher_day_${currentDay}`);
               localStorage.removeItem(`completed_voucher_day_${currentDay}`);
@@ -142,7 +138,6 @@ export default function App() {
         console.log("Błąd pobierania danych", e);
       }
 
-      // Fallback dla trybu Test lub braku danych
       const storageKey = isTestMode ? `test_voucher_day_${currentDay}` : `voucher_day_${currentDay}`;
       const saved = localStorage.getItem(storageKey);
       if (saved) {
@@ -159,6 +154,7 @@ export default function App() {
     fetchVoucherData();
   }, [currentDay, isTestMode]);
 
+  // --- DŹWIĘKI I MIKOŁAJ ---
   const playMagicSound = () => {
     const audio = new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_24e20f1883.mp3');
     audio.volume = 0.5;
@@ -169,19 +165,35 @@ export default function App() {
     const audio = new Audio('https://cdn.pixabay.com/audio/2021/08/04/audio_c6ccf3232f.mp3');
     audio.volume = 0.5;
     audio.play().catch(() => {});
-  }
+  };
+
+  // NOWOŚĆ: GADAJĄCY MIKOŁAJ (Web Speech API)
+  const playSantaVoice = (textToRead) => {
+    if ('speechSynthesis' in window) {
+      // Zatrzymujemy poprzednie kwestie, jeśli klika za szybko
+      window.speechSynthesis.cancel();
+      
+      const santaMessage = `Ho ho ho! Odkryłaś swój prezent! ${textToRead}`;
+      const utterance = new SpeechSynthesisUtterance(santaMessage);
+      
+      utterance.lang = 'pl-PL'; // Polski głos
+      utterance.pitch = 0.8;    // Niższy, grubszy głos (Mikołaj)
+      utterance.rate = 0.9;     // Troszkę wolniejsze, dostojne tempo
+      
+      window.speechSynthesis.speak(utterance);
+    }
+  };
 
   const handleTriviaAnswer = (selected) => {
-    if (grinchTimeLeft > 0) return; // Zabezpieczenie przed klikaniem w trakcie kary
+    if (grinchTimeLeft > 0) return; 
 
     if (selected === trivia.correct) {
       drawVoucher();
     } else {
-      // KARA GRINCHA (ZŁA ODPOWIEDŹ)
       playGrinchSound();
       setTriviaError(true);
       
-      const penaltyDurationSeconds = 60; // 1 MINUTA KARY
+      const penaltyDurationSeconds = 60; 
       setGrinchTimeLeft(penaltyDurationSeconds);
       
       const endTime = new Date().getTime() + (penaltyDurationSeconds * 1000);
@@ -218,13 +230,15 @@ export default function App() {
     playMagicSound();
     setShowConfetti(true);
     
+    // URUCHOMIENIE MIKOŁAJA!
+    playSantaVoice(voucher);
+    
     const now = new Date().getTime();
     const timeStorageKey = isTestMode ? `time_scratched_test_voucher_day_${currentDay}` : `time_scratched_voucher_day_${currentDay}`;
     
     if (!localStorage.getItem(timeStorageKey)) {
       localStorage.setItem(timeStorageKey, now.toString());
       
-      // ZAPIS LOKALIZACJI ZDRAPKI DO CHMURY W TRYBIE PROD
       if (!isTestMode) {
         try {
           await updateDoc(doc(db, "vouchers", currentDay.toString()), {
@@ -293,7 +307,6 @@ export default function App() {
     );
   }
 
-  // ZMIANA TŁA I ŚNIEGU JEŚLI JEST KARA GRINCHA
   const isGrinchMode = grinchTimeLeft > 0;
   const bgGradient = isGrinchMode 
     ? "from-slate-900 via-slate-950 to-black" 
